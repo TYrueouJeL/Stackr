@@ -19,7 +19,18 @@ watch(() => [filters.q, filters.set, filters.rarity, filters.type, filters.facti
 
 const { data: sets } = await useApiFetch<SetSummary[]>('/sets', { default: () => [] })
 const { data: options } = await useApiFetch<{ rarities: string[]; types: string[]; factions: string[] }>('/cards/filters')
-const { data: result, status } = await useApiFetch<Paginated<Card>>('/cards', { query: computed(() => ({ ...filters, perPage: 60 })) })
+const { data: result, status, refresh } = await useApiFetch<Paginated<Card>>('/cards', { query: computed(() => ({ ...filters, perPage: 60 })) })
+const { show } = useToast()
+
+async function quickAdd(card: Card) {
+  try {
+    await api('/copies', { method: 'POST', body: { cardId: card.id } })
+    show(`${card.name} ajoutée à ta collection`)
+    await refresh()
+  } catch (e) {
+    show(apiError(e), 'error')
+  }
+}
 
 function goTo(page: number) {
   filters.page = page
@@ -52,7 +63,11 @@ function goTo(page: number) {
 
     <div v-if="result && !result.data.length" class="empty"><div class="icon">🔍</div>Aucune carte ne correspond à ta recherche.</div>
     <div class="grid cards" :style="{ opacity: status === 'pending' ? 0.55 : 1, transition: 'opacity .2s' }">
-      <CardTile v-for="card in result?.data" :key="card.id" :card="card" />
+      <CardTile v-for="card in result?.data" :key="card.id" :card="card">
+        <template #quick>
+          <button class="primary small" :title="`Ajouter un exemplaire de ${card.name}`" @click="quickAdd(card)">+ 1</button>
+        </template>
+      </CardTile>
     </div>
     <div v-if="result && result.meta.lastPage > 1" class="row" style="margin-top: 2rem; justify-content: center">
       <button :disabled="filters.page <= 1" @click="goTo(filters.page - 1)">← Précédent</button>
