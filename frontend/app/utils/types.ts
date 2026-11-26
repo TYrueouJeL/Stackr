@@ -72,7 +72,9 @@ export interface DecklistSummary {
   totalCards: number
   assignedCopies: number
   complete: boolean
-  previews: string[]
+  legend: { id: string; name: string; thumbnailUrl: string | null } | null
+  domains: string[]
+  images: string[]
 }
 
 export interface DecklistDetail {

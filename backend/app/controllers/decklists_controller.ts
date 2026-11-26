@@ -19,23 +19,68 @@ export default class DecklistsController {
       .withCount('copies', (q) => q.as('assigned'))
       .orderBy('name')
 
-    // Aperçu : jusqu'à 3 illustrations par deck, la légende en premier
+    // Aperçu : la légende du deck, ses couleurs (domaines) et quelques illustrations
     const ids = decklists.map((d) => d.id)
-    const previews = ids.length
+    const rows = ids.length
       ? await db
           .from('decklist_entries as e')
           .join('cards as c', 'c.id', 'e.card_id')
           .whereIn('e.decklist_id', ids)
-          .whereNotNull('c.thumbnail_url')
-          .select('e.decklist_id', 'c.thumbnail_url', 'c.type', 'e.quantity')
-          .orderByRaw("case when c.type = 'Legend' then 0 else 1 end")
+          .select(
+            'e.decklist_id',
+            'e.quantity',
+            'c.id',
+            'c.name',
+            'c.type',
+            'c.faction',
+            'c.thumbnail_url'
+          )
           .orderBy('e.quantity', 'desc')
+          .orderBy('c.name')
       : []
-    const covers = new Map<number, string[]>()
-    for (const row of previews) {
-      const list = covers.get(row.decklist_id) ?? []
-      if (list.length < 3) list.push(row.thumbnail_url)
-      covers.set(row.decklist_id, list)
+
+    const previews = new Map<
+      number,
+      {
+        legend: { id: string; name: string; thumbnailUrl: string | null } | null
+        domains: string[]
+        images: string[]
+      }
+    >()
+    for (const id of ids) {
+      const entries = rows.filter((r) => r.decklist_id === id)
+      const legendRow = entries.find((r) => r.type === 'Legend') ?? null
+      const split = (faction: string | null) =>
+        (faction ?? '')
+          .split('/')
+          .map((f: string) => f.trim())
+          .filter(Boolean)
+
+      // Les couleurs d'un deck sont celles de sa légende ; sans légende, les plus présentes
+      let domains = legendRow ? split(legendRow.faction) : []
+      if (!domains.length) {
+        const weight = new Map<string, number>()
+        for (const r of entries.filter((e) => e.type !== 'Rune' && e.type !== 'Battlefield')) {
+          for (const d of split(r.faction)) weight.set(d, (weight.get(d) ?? 0) + Number(r.quantity))
+        }
+        domains = [...weight.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 2)
+          .map(([d]) => d)
+      }
+
+      const images = entries
+        .filter((r) => r.thumbnail_url && r.type !== 'Legend' && r.type !== 'Rune')
+        .slice(0, 2)
+        .map((r) => r.thumbnail_url as string)
+
+      previews.set(id, {
+        legend: legendRow
+          ? { id: legendRow.id, name: legendRow.name, thumbnailUrl: legendRow.thumbnail_url }
+          : null,
+        domains,
+        images,
+      })
     }
 
     return decklists.map((d) => {
@@ -48,7 +93,7 @@ export default class DecklistsController {
         totalCards: total,
         assignedCopies: assigned,
         complete: total > 0 && assigned >= total,
-        previews: covers.get(d.id) ?? [],
+        ...(previews.get(d.id) ?? { legend: null, domains: [], images: [] }),
       }
     })
   }
