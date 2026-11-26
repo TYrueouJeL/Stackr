@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Card, Copy, DecklistDetail } from '~/utils/types'
+import { SECTION_LABELS, type Card, type Copy, type DeckSection, type DecklistDetail } from '~/utils/types'
 
 const route = useRoute()
 const id = computed(() => Number(route.params.id))
@@ -15,6 +15,24 @@ const editing = ref(false)
 const form = reactive({ name: '', description: '' })
 const openRow = ref<string | null>(null)
 const freeCopies = ref<Copy[]>([])
+const pickSection = ref<DeckSection | ''>('')
+
+type Entry = DecklistDetail['entries'][number]
+const rowKey = (e: Entry) => `${e.section}:${e.card.id}`
+const groups = computed(() =>
+  (deck.value?.sections ?? []).map((s) => ({
+    ...s,
+    label: SECTION_LABELS[s.section] ?? s.section,
+    entries: deck.value!.entries.filter((e) => e.section === s.section),
+  }))
+)
+
+function defaultSection(card: Card): DeckSection {
+  if (card.type === 'Legend') return 'legend'
+  if (card.type === 'Rune') return 'rune'
+  if (card.type === 'Battlefield') return 'battlefield'
+  return 'main'
+}
 
 watch(deck, (d) => { if (d) { form.name = d.name; form.description = d.description ?? '' } }, { immediate: true })
 
@@ -29,12 +47,13 @@ async function call<T>(path: string, options: any, message?: (r: T) => string) {
   }
 }
 
-const setQuantity = (cardId: string, quantity: number) =>
-  call(`/decklists/${id.value}/entries`, { method: 'PUT', body: { cardId, quantity: Math.max(0, quantity) } })
+const setQuantity = (cardId: string, quantity: number, section: DeckSection) =>
+  call(`/decklists/${id.value}/entries`, { method: 'PUT', body: { cardId, section, quantity: Math.max(0, quantity) } })
 
 const addCard = (card: Card) => {
-  const current = deck.value?.entries.find((e) => e.card.id === card.id)?.quantity ?? 0
-  setQuantity(card.id, current + 1)
+  const section = pickSection.value || defaultSection(card)
+  const current = deck.value?.entries.find((e) => e.card.id === card.id && e.section === section)?.quantity ?? 0
+  setQuantity(card.id, current + 1, section)
 }
 
 const autoAssign = () =>
@@ -46,10 +65,13 @@ async function release() {
 }
 
 async function runImport() {
-  const r = await call<{ imported: number; notFound: string[] }>(
+  const r = await call<{ imported: number; sections: Partial<Record<DeckSection, number>>; notFound: string[] }>(
     `/decklists/${id.value}/import`,
     { method: 'POST', body: { text: importText.value, replace: replace.value } },
-    (r) => `${r.imported} carte(s) importée(s)${r.notFound.length ? `, ${r.notFound.length} introuvable(s)` : ''}`
+    (r) => {
+      const parts = Object.entries(r.sections ?? {}).filter(([, n]) => n > 0).map(([s, n]) => `${n} ${SECTION_LABELS[s as DeckSection] ?? s}`)
+      return `${r.imported} carte(s) importée(s)${parts.length ? ` (${parts.join(', ')})` : ''}${r.notFound.length ? `, ${r.notFound.length} introuvable(s)` : ''}`
+    }
   )
   if (r) {
     importText.value = r.notFound.join('\n')
@@ -74,15 +96,18 @@ async function removeDeck() {
   await navigateTo('/decklists')
 }
 
-async function toggleRow(cardId: string) {
-  if (openRow.value === cardId) { openRow.value = null; return }
-  openRow.value = cardId
-  freeCopies.value = await api<Copy[]>('/copies', { query: { cardId, decklistId: 'none' } })
+const openCardId = ref<string | null>(null)
+
+async function toggleRow(e: Entry) {
+  if (openRow.value === rowKey(e)) { openRow.value = null; openCardId.value = null; return }
+  openRow.value = rowKey(e)
+  openCardId.value = e.card.id
+  freeCopies.value = await api<Copy[]>('/copies', { query: { cardId: e.card.id, decklistId: 'none' } })
 }
 
 async function assign(copyId: number, decklistId: number | null) {
   await call('/copies', { method: 'PATCH', body: { ids: [copyId], decklistId } })
-  if (openRow.value) freeCopies.value = await api<Copy[]>('/copies', { query: { cardId: openRow.value, decklistId: 'none' } })
+  if (openCardId.value) freeCopies.value = await api<Copy[]>('/copies', { query: { cardId: openCardId.value, decklistId: 'none' } })
 }
 </script>
 
@@ -128,8 +153,11 @@ async function assign(copyId: number, decklistId: number | null) {
 
     <Transition name="page">
       <div v-if="showImport" class="panel stack" style="margin-bottom: 1.2rem">
-        <span class="muted small">Une carte par ligne : « 3 Nom de la carte » ou « 2x ID-de-carte ».</span>
-        <textarea v-model="importText" placeholder="3 Nom de la carte" />
+        <span class="muted small">
+          Colle ta liste telle quelle : sections « Legend: », « Champion: », « MainDeck: », « Battlefields: », « Runes: », « Sideboard: »,
+          puis une carte par ligne (« 3 Nom de la carte » ou « 2x ID-de-carte »). Sans section, la carte est classée selon son type.
+        </span>
+        <textarea v-model="importText" placeholder="Legend:&#10;1 Rek'Sai, Void Burrower&#10;&#10;MainDeck:&#10;3 Cleave" style="min-height: 12rem" />
         <div class="row">
           <label class="inline"><input v-model="replace" type="checkbox" /> Remplacer la liste actuelle</label>
           <span class="spacer" />
@@ -138,17 +166,32 @@ async function assign(copyId: number, decklistId: number | null) {
       </div>
     </Transition>
 
-    <CardPicker @pick="addCard" />
+    <div class="row" style="align-items: flex-start; gap: 0.6rem">
+      <div style="flex: 1; min-width: 240px"><CardPicker @pick="addCard" /></div>
+      <label class="inline small muted" style="margin-top: 0.4rem">
+        Ajouter dans
+        <select v-model="pickSection">
+          <option value="">Auto (selon le type)</option>
+          <option v-for="(label, key) in SECTION_LABELS" :key="key" :value="key">{{ label }}</option>
+        </select>
+      </label>
+    </div>
 
     <div v-if="!deck.entries.length" class="empty" style="margin-top: 1.2rem"><div class="icon">🃏</div>La decklist est vide. Ajoute des cartes avec la recherche ou l'import.</div>
-    <div v-else class="panel table-wrap" style="margin-top: 1.2rem">
+    <template v-else>
+    <section v-for="g in groups" :key="g.section" class="deck-section fade-up">
+      <header class="deck-section-head">
+        <h2>{{ g.label }}</h2>
+        <span class="tag">{{ g.count }} carte{{ g.count > 1 ? 's' : '' }}</span>
+      </header>
+      <div class="panel table-wrap">
       <table>
         <thead>
           <tr><th>Carte</th><th>Type</th><th>Quantité</th><th>En place</th><th>Libres</th><th /></tr>
         </thead>
         <tbody>
-          <template v-for="e in deck.entries" :key="e.card.id">
-            <tr :class="{ 'deck-row-open': openRow === e.card.id }">
+          <template v-for="e in g.entries" :key="rowKey(e)">
+            <tr :class="{ 'deck-row-open': openRow === rowKey(e) }">
               <td>
                 <NuxtLink :to="`/cards/${encodeURIComponent(e.card.id)}`" class="card-cell">
                   <img v-if="e.card.thumbnailUrl" :src="e.card.thumbnailUrl" class="thumb" alt="" loading="lazy" />
@@ -161,16 +204,16 @@ async function assign(copyId: number, decklistId: number | null) {
               <td class="small muted">{{ e.card.type }}</td>
               <td>
                 <div class="row" style="gap: 0.35rem; flex-wrap: nowrap">
-                  <button class="icon small" @click="setQuantity(e.card.id, e.quantity - 1)">−</button>
+                  <button class="icon small" @click="setQuantity(e.card.id, e.quantity - 1, e.section)">−</button>
                   <strong style="min-width: 1.2rem; text-align: center">{{ e.quantity }}</strong>
-                  <button class="icon small" @click="setQuantity(e.card.id, e.quantity + 1)">+</button>
+                  <button class="icon small" @click="setQuantity(e.card.id, e.quantity + 1, e.section)">+</button>
                 </div>
               </td>
               <td><span class="tag" :class="e.missing ? (e.available ? 'warn' : 'danger') : 'ok'">{{ e.assigned.length }} / {{ e.quantity }}</span></td>
               <td class="small">{{ e.available }}</td>
-              <td style="text-align: right"><button class="small" @click="toggleRow(e.card.id)">{{ openRow === e.card.id ? 'Fermer' : 'Exemplaires' }}</button></td>
+              <td style="text-align: right"><button class="small" @click="toggleRow(e)">{{ openRow === rowKey(e) ? 'Fermer' : 'Exemplaires' }}</button></td>
             </tr>
-            <tr v-if="openRow === e.card.id" class="deck-row-open">
+            <tr v-if="openRow === rowKey(e)" class="deck-row-open">
               <td colspan="6">
                 <div class="stack small" style="padding: 0.3rem 0">
                   <span class="eyebrow">Dans ce deck</span>
@@ -199,7 +242,9 @@ async function assign(copyId: number, decklistId: number | null) {
           </template>
         </tbody>
       </table>
-    </div>
+      </div>
+    </section>
+    </template>
 
     <template v-if="deck.extraCopies.length">
       <h2>Exemplaires affectés hors liste</h2>
@@ -214,3 +259,17 @@ async function assign(copyId: number, decklistId: number | null) {
     </template>
   </div>
 </template>
+
+<style scoped>
+.deck-section { margin-top: 1.4rem; }
+.deck-section-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.55rem; }
+.deck-section-head h2 { margin: 0; font-size: 1.15rem; }
+@media (min-width: 760px) {
+  .deck-section table { table-layout: fixed; width: 100%; }
+  .deck-section th:nth-child(1) { width: 34%; }
+  .deck-section th:nth-child(2) { width: 13%; }
+  .deck-section th:nth-child(3) { width: 16%; }
+  .deck-section th:nth-child(4) { width: 12%; }
+  .deck-section th:nth-child(5) { width: 9%; }
+}
+</style>

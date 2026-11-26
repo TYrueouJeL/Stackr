@@ -77,6 +77,17 @@ export interface DecklistSummary {
   images: string[]
 }
 
+export type DeckSection = 'legend' | 'champion' | 'main' | 'battlefield' | 'rune' | 'sideboard'
+
+export const SECTION_LABELS: Record<DeckSection, string> = {
+  legend: 'Légende',
+  champion: 'Champion choisi',
+  main: 'Deck principal',
+  battlefield: 'Champs de bataille',
+  rune: 'Runes',
+  sideboard: 'Sideboard',
+}
+
 export interface DecklistDetail {
   id: number
   name: string
@@ -84,7 +95,15 @@ export interface DecklistDetail {
   totalCards: number
   assignedCopies: number
   missingCards: number
-  entries: { card: Card; quantity: number; assigned: Copy[]; missing: number; available: number }[]
+  entries: {
+    section: DeckSection
+    card: Card
+    quantity: number
+    assigned: Copy[]
+    missing: number
+    available: number
+  }[]
+  sections: { section: DeckSection; count: number }[]
   extraCopies: Copy[]
 }
 

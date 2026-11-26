@@ -41,6 +41,9 @@ export const decklistValidator = vine.create({
 export const decklistEntryValidator = vine.create({
   cardId: vine.string().exists({ table: 'cards', column: 'id' }),
   quantity: vine.number().withoutDecimals().min(0).max(99),
+  section: vine
+    .enum(['legend', 'champion', 'main', 'battlefield', 'rune', 'sideboard'] as const)
+    .optional(),
 })
 
 export const decklistImportValidator = vine.create({

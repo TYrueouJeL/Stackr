@@ -122,7 +122,7 @@ export class CardSchema extends BaseModel {
 }
 
 export class DecklistEntrySchema extends BaseModel {
-  static $columns = ['cardId', 'createdAt', 'decklistId', 'id', 'quantity', 'updatedAt'] as const
+  static $columns = ['cardId', 'createdAt', 'decklistId', 'id', 'quantity', 'section', 'updatedAt'] as const
   $columns = DecklistEntrySchema.$columns
   @column()
   declare cardId: string
@@ -134,6 +134,8 @@ export class DecklistEntrySchema extends BaseModel {
   declare id: number
   @column()
   declare quantity: number
+  @column()
+  declare section: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
 }

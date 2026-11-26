@@ -4,7 +4,14 @@ import db from '@adonisjs/lucid/services/db'
 import Decklist from '#models/decklist'
 import DecklistEntry from '#models/decklist_entry'
 import CardCopy from '#models/card_copy'
-import Card from '#models/card'
+import {
+  SECTIONS,
+  type Section,
+  buildCardResolver,
+  formatDecklist,
+  parseDecklist,
+  sectionForType,
+} from '#services/decklist_text'
 import {
   decklistEntryValidator,
   decklistImportValidator,
@@ -49,7 +56,10 @@ export default class DecklistsController {
     >()
     for (const id of ids) {
       const entries = rows.filter((r) => r.decklist_id === id)
-      const legendRow = entries.find((r) => r.type === 'Legend') ?? null
+      const legendRow =
+        entries.find((r) => r.section === 'legend') ??
+        entries.find((r) => r.type === 'Legend') ??
+        null
       const split = (faction: string | null) =>
         (faction ?? '')
           .split('/')
@@ -60,7 +70,7 @@ export default class DecklistsController {
       let domains = legendRow ? split(legendRow.faction) : []
       if (!domains.length) {
         const weight = new Map<string, number>()
-        for (const r of entries.filter((e) => e.type !== 'Rune' && e.type !== 'Battlefield')) {
+        for (const r of entries.filter((e) => e.section === 'main' || e.section === 'champion')) {
           for (const d of split(r.faction)) weight.set(d, (weight.get(d) ?? 0) + Number(r.quantity))
         }
         domains = [...weight.entries()]
@@ -70,7 +80,13 @@ export default class DecklistsController {
       }
 
       const images = entries
-        .filter((r) => r.thumbnail_url && r.type !== 'Legend' && r.type !== 'Rune')
+        .filter(
+          (r) =>
+            r.thumbnail_url &&
+            r.id !== legendRow?.id &&
+            !['rune', 'battlefield', 'sideboard', 'legend'].includes(r.section)
+        )
+        .sort((a, b) => (a.section === 'champion' ? -1 : b.section === 'champion' ? 1 : 0))
         .slice(0, 2)
         .map((r) => r.thumbnail_url as string)
 
@@ -130,9 +146,22 @@ export default class DecklistsController {
       : []
     const free = new Map(freeRows.map((r) => [r.card_id as string, Number(r.free)]))
 
+    // Les exemplaires affectés d'une carte sont répartis entre ses sections, dans l'ordre
+    const order = (section: string) => SECTIONS.indexOf(section as Section)
+    entries.sort(
+      (a, b) =>
+        order(a.section) - order(b.section) ||
+        (a.card.type ?? '').localeCompare(b.card.type ?? '') ||
+        a.card.name.localeCompare(b.card.name)
+    )
+    const pool = new Map<string, CardCopy[]>()
+    for (const copy of copies) pool.set(copy.cardId, [...(pool.get(copy.cardId) ?? []), copy])
+
     const rows = entries.map((entry) => {
-      const assigned = copies.filter((c) => c.cardId === entry.cardId)
+      const remaining = pool.get(entry.cardId) ?? []
+      const assigned = remaining.splice(0, entry.quantity)
       return {
+        section: entry.section,
         card: entry.card.toApi(),
         quantity: entry.quantity,
         assigned: assigned.map((c) => c.toApi()),
@@ -141,17 +170,15 @@ export default class DecklistsController {
       }
     })
 
-    // Exemplaires affectés à la decklist mais absents de la liste
-    const extra = copies.filter((c) => !entries.some((e) => e.cardId === c.cardId))
-
-    rows.sort(
-      (a, b) =>
-        (a.card.type ?? '').localeCompare(b.card.type ?? '') ||
-        a.card.name.localeCompare(b.card.name)
-    )
+    // Exemplaires affectés en trop ou à des cartes absentes de la liste
+    const extra = [...pool.values()].flat()
 
     const totalCards = rows.reduce((s, r) => s + r.quantity, 0)
-    const assignedCount = rows.reduce((s, r) => s + Math.min(r.quantity, r.assigned.length), 0)
+    const assignedCount = rows.reduce((s, r) => s + r.assigned.length, 0)
+    const sections = SECTIONS.map((section) => ({
+      section,
+      count: rows.filter((r) => r.section === section).reduce((s, r) => s + r.quantity, 0),
+    }))
     return {
       id: decklist.id,
       name: decklist.name,
@@ -159,6 +186,7 @@ export default class DecklistsController {
       totalCards,
       assignedCopies: assignedCount,
       missingCards: rows.reduce((s, r) => s + r.missing, 0),
+      sections,
       entries: rows,
       extraCopies: extra.map((c) => c.toApi()),
     }
@@ -186,58 +214,74 @@ export default class DecklistsController {
    */
   async setEntry({ auth, params, request }: HttpContext) {
     const decklist = await this.find(auth.getUserOrFail().id, params.id)
-    const { cardId, quantity } = await request.validateUsing(decklistEntryValidator)
+    const {
+      cardId,
+      quantity,
+      section: wanted,
+    } = await request.validateUsing(decklistEntryValidator)
+    const card = await db.from('cards').where('id', cardId).select('type').first()
+    const section = wanted ?? sectionForType(card?.type)
     if (quantity === 0) {
-      await DecklistEntry.query().where({ decklist_id: decklist.id, card_id: cardId }).delete()
-      return { cardId, quantity: 0 }
+      await DecklistEntry.query()
+        .where({ decklist_id: decklist.id, card_id: cardId, section })
+        .delete()
+      return { cardId, section, quantity: 0 }
     }
     const entry = await DecklistEntry.updateOrCreate(
-      { decklistId: decklist.id, cardId },
+      { decklistId: decklist.id, cardId, section },
       { quantity }
     )
-    return { cardId: entry.cardId, quantity: entry.quantity }
+    return { cardId: entry.cardId, section: entry.section, quantity: entry.quantity }
   }
 
   /**
-   * Importe une liste texte ("3 Nom de carte" ou "3x ID") dans la decklist
+   * Importe une liste texte. Accepte le format par sections des deckbuilders
+   * (Legend:, Champion:, MainDeck:, Battlefields:, Runes:, Sideboard:) ou une
+   * simple liste "3 Nom de carte". Sans section, elle est déduite du type de carte.
    */
   async importText({ auth, params, request }: HttpContext) {
     const decklist = await this.find(auth.getUserOrFail().id, params.id)
     const { text, replace } = await request.validateUsing(decklistImportValidator)
+    const resolve = await buildCardResolver()
 
-    const wanted = new Map<string, number>()
+    const wanted = new Map<string, { cardId: string; section: Section; quantity: number }>()
     const notFound: string[] = []
-    for (const rawLine of text.split(/\r?\n/)) {
-      const line = rawLine.trim()
-      if (!line || line.startsWith('#') || line.startsWith('//')) continue
-      const match = line.match(/^(\d+)\s*x?\s+(.+)$/i)
-      const quantity = match ? Number(match[1]) : 1
-      const label = (match ? match[2] : line).trim()
-      const card =
-        (await Card.find(label)) ??
-        (await Card.query()
-          .whereRaw('lower(name) = ?', [label.toLowerCase()])
-          .orderBy('id')
-          .first())
+    for (const line of parseDecklist(text)) {
+      const card = resolve(line.label)
       if (!card) {
-        notFound.push(line)
+        notFound.push(line.raw)
         continue
       }
-      wanted.set(card.id, (wanted.get(card.id) ?? 0) + quantity)
+      const section = line.section ?? sectionForType(card.type)
+      const key = `${section}|${card.id}`
+      const current = wanted.get(key)
+      wanted.set(key, {
+        cardId: card.id,
+        section,
+        quantity: (current?.quantity ?? 0) + line.quantity,
+      })
     }
 
     await db.transaction(async (trx) => {
       if (replace) await trx.from('decklist_entries').where('decklist_id', decklist.id).delete()
-      for (const [cardId, quantity] of wanted) {
+      for (const { cardId, section, quantity } of wanted.values()) {
         await DecklistEntry.updateOrCreate(
-          { decklistId: decklist.id, cardId },
+          { decklistId: decklist.id, cardId, section },
           { quantity },
           { client: trx }
         )
       }
     })
 
-    return { imported: wanted.size, notFound }
+    const counts = Object.fromEntries(
+      SECTIONS.map((section) => [
+        section,
+        [...wanted.values()]
+          .filter((w) => w.section === section)
+          .reduce((sum, w) => sum + w.quantity, 0),
+      ])
+    )
+    return { imported: wanted.size, sections: counts, notFound }
   }
 
   /**
@@ -248,8 +292,13 @@ export default class DecklistsController {
     const entries = await DecklistEntry.query().where('decklist_id', decklist.id)
     let assigned = 0
 
+    // Une carte présente dans plusieurs sections demande la somme des quantités
+    const needed = new Map<string, number>()
+    for (const e of entries) needed.set(e.cardId, (needed.get(e.cardId) ?? 0) + e.quantity)
+
     await db.transaction(async (trx) => {
-      for (const entry of entries) {
+      for (const [cardId, quantity] of needed) {
+        const entry = { cardId, quantity }
         const already = await trx
           .from('card_copies')
           .where({ decklist_id: decklist.id, card_id: entry.cardId })
@@ -298,10 +347,9 @@ export default class DecklistsController {
   async exportText({ auth, params, response }: HttpContext) {
     const decklist = await this.find(auth.getUserOrFail().id, params.id)
     const entries = await DecklistEntry.query().where('decklist_id', decklist.id).preload('card')
-    const text = entries
-      .sort((a, b) => a.card.name.localeCompare(b.card.name))
-      .map((e) => `${e.quantity} ${e.card.name}`)
-      .join('\n')
+    const text = formatDecklist(
+      entries.map((e) => ({ section: e.section, quantity: e.quantity, name: e.card.name }))
+    )
     return response.header('content-type', 'text/plain; charset=utf-8').send(text)
   }
 

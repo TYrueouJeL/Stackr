@@ -213,3 +213,202 @@ test.group('Import RiftCodex', () => {
     assert.deepEqual(dto.tags, ['Yordle'])
   })
 })
+
+const USER_DECK = `Legend:
+1 Rek'Sai, Void Burrower
+
+Champion:
+1 Rek'Sai, Breacher
+
+MainDeck:
+2 Bilgewater Tracker
+2 Blood Rush
+3 Carrion Dredger
+3 Cleave
+3 Cull the Weak
+3 Faithful Manufactor
+3 Falling Star
+2 Imperial Decree
+3 Inferna
+1 Lingering Animus
+3 Noxus Hopeful
+2 Rage Amplifier
+3 Trifarian Captain
+3 Undertitan
+2 Vanguard Captain
+1 Vi, Peacekeeper
+
+Battlefields:
+1 Forbidding Waste
+1 The Candlelit Sanctum
+1 Trifarian War Camp
+
+Runes:
+6 Fury Rune
+6 Order Rune
+
+Sideboard:
+3 Decree of Rage
+1 Decree of Unity
+2 Raucous Anthem
+3 Salvage
+1 Vi, Peacekeeper`
+
+function deckFixture() {
+  const names: [string, string][] = [
+    ["Rek'sai - Void Burrower", 'Legend'],
+    ["Rek'Sai - Breacher", 'Unit'],
+    ['Bilgewater Tracker', 'Unit'],
+    ['Blood Rush', 'Spell'],
+    ['Carrion Dredger', 'Unit'],
+    ['Cleave', 'Spell'],
+    ['Cull the Weak', 'Spell'],
+    ['Faithful Manufactor', 'Unit'],
+    ['Falling Star', 'Spell'],
+    ['Imperial Decree', 'Spell'],
+    ['Inferna', 'Unit'],
+    ['Lingering Animus', 'Spell'],
+    ['Noxus Hopeful', 'Unit'],
+    ['Rage Amplifier', 'Gear'],
+    ['Trifarian Captain', 'Unit'],
+    ['Undertitan', 'Unit'],
+    ['Vanguard Captain', 'Unit'],
+    ['Vi - Peacekeeper', 'Unit'],
+    ['Forbidding Waste', 'Battlefield'],
+    ['The Candlelit Sanctum', 'Battlefield'],
+    ['Trifarian War Camp', 'Battlefield'],
+    ['Fury Rune', 'Rune'],
+    ['Order Rune', 'Rune'],
+    ['Decree of Rage', 'Spell'],
+    ['Decree of Unity', 'Spell'],
+    ['Raucous Anthem', 'Spell'],
+    ['Salvage', 'Spell'],
+  ]
+  const cards = names.map(([name, type], i) => ({
+    id: `DCK-${String(i + 1).padStart(3, '0')}`,
+    collectorNumber: i + 1,
+    set: 'DCK',
+    name,
+    type,
+    faction: name.startsWith('Order') ? 'Order' : 'Fury',
+  }))
+  // Variantes qui ne doivent pas être choisies à la place de la version de base
+  cards.push(
+    {
+      id: 'DCK-900',
+      collectorNumber: 900,
+      set: 'DCK',
+      name: 'Fury Rune (Alternate Art)',
+      type: 'Rune',
+      faction: 'Fury',
+    },
+    {
+      id: 'PRM-001',
+      collectorNumber: 1,
+      set: 'PRM',
+      name: 'Cleave',
+      type: 'Spell',
+      faction: 'Fury',
+    }
+  )
+  return importContent({
+    game: 'riftbound',
+    version: 'deck',
+    lastUpdated: '2026-01-01T00:00:00Z',
+    sets: [
+      { id: 'DCK', name: 'Deck set', cards: cards.filter((c) => c.set === 'DCK') },
+      { id: 'PRM', name: 'Promo', cards: cards.filter((c) => c.set === 'PRM') },
+    ],
+  } as any)
+}
+
+test.group('Decklists par sections', (group) => {
+  group.each.setup(async () => {
+    const cleanup = await testUtils.db().truncate()
+    user = await User.create({ email: 'ty@example.com', password: 'motdepasse123' })
+    return cleanup
+  })
+
+  test("importe le copier-coller par sections et le réexporte à l'identique", async ({
+    assert,
+    client,
+  }) => {
+    await deckFixture()
+    const deck = await client.post('/api/v1/decklists').loginAs(user).json({ name: "Rek'Sai" })
+    const deckId = (deck.body() as any).id
+
+    const imported = await client
+      .post(`/api/v1/decklists/${deckId}/import`)
+      .loginAs(user)
+      .json({ text: USER_DECK })
+    imported.assertStatus(200)
+    const body = imported.body() as any
+    assert.deepEqual(body.notFound, [])
+    assert.deepEqual(body.sections, {
+      legend: 1,
+      champion: 1,
+      main: 39,
+      battlefield: 3,
+      rune: 12,
+      sideboard: 10,
+    })
+
+    const detail = (await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)).body() as any
+    const bySection = (s: string) => detail.entries.filter((e: any) => e.section === s)
+    assert.equal(bySection('legend')[0].card.name, "Rek'sai - Void Burrower")
+    assert.equal(bySection('champion')[0].card.name, "Rek'Sai - Breacher")
+    assert.isTrue(bySection('main').some((e: any) => e.card.name === 'Vi - Peacekeeper'))
+    assert.isTrue(bySection('sideboard').some((e: any) => e.card.name === 'Vi - Peacekeeper'))
+    assert.equal(bySection('rune').find((e: any) => e.card.name === 'Fury Rune').quantity, 6)
+    assert.equal(bySection('main').find((e: any) => e.card.name === 'Cleave').card.id, 'DCK-006')
+    assert.deepEqual(
+      detail.sections.map((s: any) => s.section),
+      ['legend', 'champion', 'main', 'battlefield', 'rune', 'sideboard']
+    )
+
+    const exported = await client.get(`/api/v1/decklists/${deckId}/export`).loginAs(user)
+    const normalize = (t: string) =>
+      t
+        .toLowerCase()
+        .trim()
+        .split('\n\n')
+        .map((block) => {
+          const [header, ...lines] = block.split('\n')
+          return [header, ...lines.sort()].join('\n')
+        })
+        .join('\n\n')
+    assert.equal(normalize(exported.text()), normalize(USER_DECK))
+
+    const list = (await client.get('/api/v1/decklists').loginAs(user)).body() as any
+    assert.equal(list[0].legend.name, "Rek'sai - Void Burrower")
+    assert.include(list[0].domains, 'Fury')
+  })
+
+  test('une même carte peut être en main deck et en sideboard', async ({ assert, client }) => {
+    await deckFixture()
+    const deck = await client.post('/api/v1/decklists').loginAs(user).json({ name: 'Vi' })
+    const deckId = (deck.body() as any).id
+    await client
+      .put(`/api/v1/decklists/${deckId}/entries`)
+      .loginAs(user)
+      .json({ cardId: 'DCK-018', quantity: 2 })
+    await client
+      .put(`/api/v1/decklists/${deckId}/entries`)
+      .loginAs(user)
+      .json({ cardId: 'DCK-018', quantity: 1, section: 'sideboard' })
+    await client.post('/api/v1/copies').loginAs(user).json({ cardId: 'DCK-018', quantity: 3 })
+    const assigned = await client.post(`/api/v1/decklists/${deckId}/auto-assign`).loginAs(user)
+    assert.equal((assigned.body() as any).assigned, 3)
+
+    const detail = (await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)).body() as any
+    assert.equal(detail.totalCards, 3)
+    assert.equal(detail.missingCards, 0)
+    assert.deepEqual(
+      detail.entries.map((e: any) => [e.section, e.quantity, e.assigned.length]),
+      [
+        ['main', 2, 2],
+        ['sideboard', 1, 1],
+      ]
+    )
+  })
+})
