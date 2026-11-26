@@ -777,3 +777,143 @@ test.group('Recherche de cartes', (group) => {
     assert.deepEqual(await search('50%'), [])
   })
 })
+
+test.group('Galerie Riot (Radiance)', (group) => {
+  group.each.setup(async () => {
+    const cleanup = await testUtils.db().truncate()
+    user = await User.create({ email: 'ty@example.com', password: 'motdepasse123' })
+    return cleanup
+  })
+
+  const legend = {
+    id: 'rad-175-167',
+    publicCode: 'RAD-175/167',
+    name: "Agony's Embrace",
+    collectorNumber: 175,
+    set: { label: 'Set', value: { id: 'RAD', label: 'Radiance' } },
+    cardType: { label: 'Type', type: [{ id: 'legend', label: 'Legend' }] },
+    rarity: { label: 'Rarity', value: { id: 'showcase', label: 'Showcase' } },
+    domain: {
+      label: 'Domain',
+      values: [
+        { id: 'body', label: 'Body' },
+        { id: 'chaos', label: 'Chaos' },
+      ],
+    },
+    tags: { label: 'Tags', tags: ['Evelynn'] },
+    orientation: 'portrait',
+    text: {
+      label: 'Text',
+      richText: { type: 'html', body: '<p>When you play a unit, <b>draw</b> 1.</p>' },
+    },
+    cardImage: { url: 'https://cmsassets.rgpub.io/sanity/images/x/rad-175.png' },
+  }
+  const unit = {
+    id: 'ogn-119-298',
+    name: 'Ahri',
+    subtitle: 'Inquisitive',
+    collectorNumber: 119,
+    set: { label: 'Set', value: { id: 'OGN', label: 'Origins' } },
+    cardType: {
+      label: 'Type',
+      type: [{ id: 'unit', label: 'Unit' }],
+      superType: [{ id: 'champion', label: 'Champion' }],
+    },
+    rarity: { label: 'Rarity', value: { id: 'epic', label: 'Epic' } },
+    domain: { label: 'Domain', values: [{ id: 'mind', label: 'Mind' }] },
+    energy: { label: 'Energy', value: { id: '3', label: '3' } },
+    might: { label: 'Might', value: { id: '3', label: '3' } },
+    power: { label: 'Power', value: { id: '1', label: '1' } },
+    tags: { label: 'Tags', tags: ['Ahri', 'Ionia'] },
+    illustrator: { label: 'Illustrator', values: [{ id: 'x', label: 'Shawn Tan' }] },
+  }
+  const battlefield = {
+    id: 'unl-205-219',
+    name: 'Abandoned Hall',
+    collectorNumber: 205,
+    set: { label: 'Set', value: { id: 'UNL', label: 'Unleashed' } },
+    cardType: { label: 'Type', type: [{ id: 'battlefield', label: 'Battlefield' }] },
+    domain: { label: 'Domain', values: [{ id: 'colorless', label: 'Colorless' }] },
+    orientation: 'landscape',
+  }
+
+  test('convertit les cartes de la galerie au format interne', async ({ assert }) => {
+    const { galleryCardToDTO } = await import('#services/riot_gallery')
+    const l = galleryCardToDTO(legend as any)
+    assert.equal(l.id, 'RAD-175-167')
+    assert.equal(l.name, "Evelynn - Agony's Embrace")
+    assert.equal(l.type, 'Legend')
+    assert.equal(l.faction, 'Body / Chaos')
+    assert.equal(l.description, 'When you play a unit, draw 1.')
+    const u = galleryCardToDTO(unit as any)
+    assert.equal(u.name, 'Ahri - Inquisitive')
+    assert.equal(u.stats?.energy, 3)
+    assert.deepEqual(u.keywords, ['Champion'])
+    assert.equal(u.art?.artist, 'Shawn Tan')
+    const b = galleryCardToDTO(battlefield as any)
+    assert.equal(b.type, 'Battlefield')
+    assert.isNull(b.faction)
+  })
+
+  test("complète RiftCodex avec les extensions qu'il n'a pas, sans doublon", async ({
+    assert,
+    client,
+  }) => {
+    const { galleryToContent } = await import('#services/riot_gallery')
+    const { mergeContent } = await import('#services/content_source')
+    const codex = {
+      game: 'riftbound',
+      version: 'riftcodex',
+      lastUpdated: '2026-11-26',
+      sets: [
+        {
+          id: 'OGN',
+          name: 'Origins',
+          cards: [
+            {
+              id: 'OGN-119-298',
+              collectorNumber: 119,
+              set: 'OGN',
+              name: 'Ahri - Inquisitive',
+              type: 'Unit',
+            },
+          ],
+        },
+      ],
+    }
+    const gallery = galleryToContent(
+      [
+        { id: 'OGN', name: 'Origins' },
+        { id: 'RAD', name: 'Radiance' },
+      ],
+      [legend as any, unit as any]
+    )
+    const merged = mergeContent(codex as any, gallery)
+    assert.deepEqual(
+      merged.sets.map((s) => [s.id, s.cards.length]),
+      [
+        ['OGN', 1],
+        ['RAD', 1],
+      ]
+    )
+    assert.equal(merged.sets[0].cards[0].name, 'Ahri - Inquisitive')
+
+    await importContent(merged)
+    await importContent(merged)
+    const res = await client.get('/api/v1/cards').qs({ q: 'RAD 175' }).loginAs(user)
+    assert.deepEqual(
+      (res.body() as any).data.map((c: any) => c.id),
+      ['RAD-175-167']
+    )
+    const sets = await client.get('/api/v1/sets').loginAs(user)
+    assert.include(
+      (sets.body() as any).map((s: any) => s.id),
+      'RAD'
+    )
+    // Sans RiftCodex, la galerie seule suffit
+    assert.deepEqual(
+      mergeContent(null, gallery).sets.map((s) => s.id),
+      ['OGN', 'RAD']
+    )
+  })
+})

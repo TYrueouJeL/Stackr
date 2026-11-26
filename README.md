@@ -30,7 +30,9 @@ cd backend
 npm install
 cp .env.example .env
 node ace generate:key
-# IMPORT_SOURCE=riftcodex (défaut) ou riot ; pour riot, renseigner RIOT_API_KEY et RIOT_REGION
+# IMPORT_SOURCE=all (défaut : RiftCodex + galerie officielle Riot pour les extensions
+# que RiftCodex n'a pas encore, ex. Radiance), riftcodex, gallery ou riot
+# (pour riot, renseigner RIOT_API_KEY et RIOT_REGION)
 node ace migration:run
 node ace riftbound:import                    # importe toutes les cartes depuis IMPORT_SOURCE
 node ace riftbound:import --source=riot      # forcer l'API officielle Riot

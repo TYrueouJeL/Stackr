@@ -13,10 +13,14 @@ import {
 
 export default class ImportCards extends BaseCommand {
   static commandName = 'riftbound:import'
-  static description = 'Importe toutes les cartes Riftbound (RiftCodex ou API Riot Games)'
+  static description =
+    'Importe toutes les cartes Riftbound (RiftCodex, galerie Riot ou API Riot Games)'
   static options: CommandOptions = { startApp: true }
 
-  @flags.string({ description: 'Source : riftcodex (communautaire) ou riot (API officielle)' })
+  @flags.string({
+    description:
+      'Source : all (RiftCodex + galerie Riot, défaut), riftcodex, gallery ou riot (API avec clé)',
+  })
   declare source?: string
 
   @flags.string({

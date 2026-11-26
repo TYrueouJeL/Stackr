@@ -64,5 +64,5 @@ export const decklistImportValidator = vine.create({
 
 export const importValidator = vine.create({
   locale: vine.string().maxLength(10).optional(),
-  source: vine.enum(['riftcodex', 'riot'] as const).optional(),
+  source: vine.enum(['all', 'riftcodex', 'gallery', 'riot'] as const).optional(),
 })

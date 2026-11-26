@@ -1,4 +1,5 @@
 <script setup lang="ts">
+type ImportSource = 'all' | 'riftcodex' | 'gallery' | 'riot'
 import type { SetSummary } from '~/utils/types'
 
 const { show } = useToast()
@@ -9,13 +10,13 @@ const { data: status, refresh: refreshStatus } = await useApiFetch<{
   cards: number
   copies: number
   lastImport: string | null
-  source: 'riftcodex' | 'riot'
+  source: ImportSource
   apiKeyConfigured: boolean
   canImport: boolean
 }>('/import')
 
 const importing = ref(false)
-const source = ref<'riftcodex' | 'riot'>(status.value?.source ?? 'riftcodex')
+const source = ref<ImportSource>(status.value?.source ?? 'all')
 
 const totals = computed(() => {
   const all = sets.value ?? []
@@ -74,8 +75,10 @@ async function runImport() {
       </div>
       <div v-if="status?.canImport" class="row">
         <select v-model="source" title="Source des cartes">
-          <option value="riftcodex">RiftCodex (communautaire)</option>
-          <option value="riot">API officielle Riot</option>
+          <option value="all">RiftCodex + galerie Riot (recommandé)</option>
+          <option value="riftcodex">RiftCodex seul</option>
+          <option value="gallery">Galerie officielle Riot seule</option>
+          <option value="riot">API développeur Riot (clé)</option>
         </select>
         <button class="primary" :disabled="importing" @click="runImport">
           {{ importing ? 'Import en cours…' : '⟳ Mettre à jour le catalogue' }}

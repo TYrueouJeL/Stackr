@@ -31,5 +31,5 @@ export default await Env.create(new URL('../', import.meta.url), {
   // API Riot Games (Riftbound)
   RIOT_API_KEY: Env.schema.string.optional(),
   RIOT_REGION: Env.schema.string.optional(),
-  IMPORT_SOURCE: Env.schema.enum.optional(['riftcodex', 'riot'] as const),
+  IMPORT_SOURCE: Env.schema.enum.optional(['all', 'riftcodex', 'gallery', 'riot'] as const),
 })
