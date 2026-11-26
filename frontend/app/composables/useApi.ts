@@ -1,10 +1,25 @@
-const BASE = '/api/v1'
+export const TOKEN_COOKIE = 'stackr_token'
+
+type ApiFetch = typeof $fetch
+let clientApi: ApiFetch | null = null
+
+export function setClientApi(instance: ApiFetch) {
+  clientApi = instance
+}
 
 /**
- * Appels à l'API AdonisJS (relayée par Nuxt sur /api)
+ * Appel à l'API AdonisJS (préfixe /api/v1 ajouté automatiquement, jeton inclus)
  */
 export function api<T = unknown>(path: string, options: Parameters<typeof $fetch>[1] = {}) {
-  return $fetch<T>(`${BASE}${path}`, options as any)
+  const instance = (import.meta.client && clientApi) || (useNuxtApp().$api as ApiFetch)
+  return instance<T>(path, options as any) as Promise<T>
+}
+
+/**
+ * useFetch branché sur l'API (rendu serveur compris)
+ */
+export function useApiFetch<T>(path: string | (() => string), options: Record<string, unknown> = {}) {
+  return useFetch<T>(path as string, { ...options, $fetch: useNuxtApp().$api as ApiFetch } as any)
 }
 
 export function apiError(error: unknown): string {

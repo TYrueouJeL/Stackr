@@ -2,7 +2,7 @@
 import type { CardDetail } from '~/utils/types'
 
 const route = useRoute()
-const { data: card, refresh } = await useFetch<CardDetail>(() => `/api/v1/cards/${encodeURIComponent(String(route.params.id))}`)
+const { data: card, refresh } = await useApiFetch<CardDetail>(() => `/cards/${encodeURIComponent(String(route.params.id))}`)
 const { refresh: refreshRefs } = useRefs()
 onMounted(() => refreshRefs())
 

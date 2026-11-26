@@ -35,7 +35,7 @@ function cardRow(card: CardDTO, setId: string, now: string | null) {
     thumbnail_url: card.art?.thumbnailURL ?? null,
     full_url: card.art?.fullURL ?? null,
     artist: card.art?.artist ?? null,
-    raw: JSON.stringify(card),
+    raw: JSON.stringify(card.raw ?? card),
     created_at: now,
     updated_at: now,
   }

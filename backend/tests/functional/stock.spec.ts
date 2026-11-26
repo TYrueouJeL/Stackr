@@ -2,14 +2,22 @@ import { readFile } from 'node:fs/promises'
 import { test } from '@japa/runner'
 import testUtils from '@adonisjs/core/services/test_utils'
 import importContent from '#services/card_importer'
+import User from '#models/user'
+import StorageLocation from '#models/storage_location'
 
 async function loadFixture() {
   const raw = await readFile(new URL('../fixtures/content.json', import.meta.url), 'utf8')
   return importContent(JSON.parse(raw))
 }
 
+let user: User
+
 test.group('Stock Riftbound', (group) => {
-  group.each.setup(() => testUtils.db().truncate())
+  group.each.setup(async () => {
+    const cleanup = await testUtils.db().truncate()
+    user = await User.create({ email: 'ty@example.com', password: 'motdepasse123' })
+    return cleanup
+  })
 
   test("l'import crée les extensions et les cartes, et peut être relancé", async ({
     assert,
@@ -20,7 +28,7 @@ test.group('Stock Riftbound', (group) => {
     const second = await loadFixture()
     assert.equal(second.cards, 5)
 
-    const response = await client.get('/api/v1/sets')
+    const response = await client.get('/api/v1/sets').loginAs(user)
     response.assertStatus(200)
     assert.lengthOf(response.body() as any, 2)
     assert.equal((response.body() as any)[0].id, 'TST')
@@ -32,45 +40,53 @@ test.group('Stock Riftbound', (group) => {
     client,
   }) => {
     await loadFixture()
-    const a = await client.post('/api/v1/copies').json({ cardId: 'TST-001', quantity: 3 })
+    const a = await client
+      .post('/api/v1/copies')
+      .loginAs(user)
+      .json({ cardId: 'TST-001', quantity: 3 })
     a.assertStatus(201)
-    const b = await client.post('/api/v1/copies').json({ cardId: 'TST-002' })
+    const b = await client.post('/api/v1/copies').loginAs(user).json({ cardId: 'TST-002' })
     b.assertStatus(201)
 
-    const sets = await client.get('/api/v1/sets')
+    const sets = await client.get('/api/v1/sets').loginAs(user)
     const tst = (sets.body() as any).find((s: any) => s.id === 'TST')
     assert.equal(tst.ownedCards, 2)
     assert.equal(tst.totalCopies, 4)
     assert.equal(tst.completion, 50)
 
-    const detail = await client.get('/api/v1/sets/TST')
+    const detail = await client.get('/api/v1/sets/TST').loginAs(user)
     assert.equal((detail.body() as any).cards.find((c: any) => c.id === 'TST-001').owned, 3)
   })
 
   test('les exemplaires sont rangés et affectés aux decklists', async ({ assert, client }) => {
     await loadFixture()
-    const box = await client.post('/api/v1/storage-locations').json({ name: 'Classeur 1' })
+    const box = await client
+      .post('/api/v1/storage-locations')
+      .loginAs(user)
+      .json({ name: 'Classeur 1' })
     box.assertStatus(201)
     const boxId = (box.body() as any).id
 
     const added = await client
       .post('/api/v1/copies')
+      .loginAs(user)
       .json({ cardId: 'TST-001', quantity: 2, storageLocationId: boxId })
     added.assertStatus(201)
 
-    const deck = await client.post('/api/v1/decklists').json({ name: 'Mon deck' })
+    const deck = await client.post('/api/v1/decklists').loginAs(user).json({ name: 'Mon deck' })
     const deckId = (deck.body() as any).id
 
     const imported = await client
       .post(`/api/v1/decklists/${deckId}/import`)
+      .loginAs(user)
       .json({ text: '3 Carte Alpha\n1x TST-003\n2 Carte inconnue' })
     assert.equal((imported.body() as any).imported, 2)
     assert.deepEqual((imported.body() as any).notFound, ['2 Carte inconnue'])
 
-    const auto = await client.post(`/api/v1/decklists/${deckId}/auto-assign`)
+    const auto = await client.post(`/api/v1/decklists/${deckId}/auto-assign`).loginAs(user)
     assert.equal((auto.body() as any).assigned, 2)
 
-    const detail = await client.get(`/api/v1/decklists/${deckId}`)
+    const detail = await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)
     assert.equal((detail.body() as any).totalCards, 4)
     assert.equal((detail.body() as any).assignedCopies, 2)
     assert.equal((detail.body() as any).missingCards, 2)
@@ -78,25 +94,122 @@ test.group('Stock Riftbound', (group) => {
     assert.lengthOf(alpha.assigned, 2)
     assert.equal(alpha.assigned[0].storageLocation.name, 'Classeur 1')
 
-    const location = await client.get(`/api/v1/storage-locations/${boxId}`)
+    const location = await client.get(`/api/v1/storage-locations/${boxId}`).loginAs(user)
     assert.lengthOf((location.body() as any).copies, 2)
     assert.equal((location.body() as any).copies[0].decklist.name, 'Mon deck')
 
-    const rel = await client.post(`/api/v1/decklists/${deckId}/release`)
+    const rel = await client.post(`/api/v1/decklists/${deckId}/release`).loginAs(user)
     rel.assertStatus(200)
-    const free = await client.get('/api/v1/copies').qs({ decklistId: 'none' })
+    const free = await client.get('/api/v1/copies').loginAs(user).qs({ decklistId: 'none' })
     assert.lengthOf(free.body() as any, 2)
+  })
+
+  test('les données sont propres à chaque utilisateur', async ({ assert, client }) => {
+    await loadFixture()
+    const other = await User.create({ email: 'autre@example.com', password: 'motdepasse123' })
+    const box = await client.post('/api/v1/storage-locations').loginAs(user).json({ name: 'Privé' })
+    await client.post('/api/v1/copies').loginAs(user).json({ cardId: 'TST-001', quantity: 2 })
+
+    const sets = await client.get('/api/v1/sets').loginAs(other)
+    assert.equal((sets.body() as any)[0].ownedCards, 0)
+    const copies = await client.get('/api/v1/copies').loginAs(other)
+    assert.lengthOf(copies.body() as any, 0)
+
+    const forbidden = await client
+      .post('/api/v1/copies')
+      .loginAs(other)
+      .json({ cardId: 'TST-001', storageLocationId: (box.body() as any).id })
+    forbidden.assertStatus(404)
+    const show = await client
+      .get(`/api/v1/storage-locations/${(box.body() as any).id}`)
+      .loginAs(other)
+    show.assertStatus(404)
+  })
+
+  test('il faut être connecté', async ({ client }) => {
+    const response = await client.get('/api/v1/sets')
+    response.assertStatus(401)
+  })
+
+  test('le premier compte est administrateur et récupère les données existantes', async ({
+    assert,
+    client,
+  }) => {
+    await User.query().delete()
+    await loadFixture()
+    await StorageLocation.create({ name: 'Ancien' })
+
+    const signup = await client.post('/api/v1/auth/signup').json({
+      email: 'premier@example.com',
+      password: 'motdepasse123',
+      passwordConfirmation: 'motdepasse123',
+    })
+    signup.assertStatus(200)
+    const first = await User.findByOrFail('email', 'premier@example.com')
+    assert.isTrue(Boolean(first.isAdmin))
+    const locations = await client.get('/api/v1/storage-locations').loginAs(first)
+    assert.lengthOf((locations.body() as any).locations, 1)
+
+    const second = await client.post('/api/v1/auth/signup').json({
+      email: 'second@example.com',
+      password: 'motdepasse123',
+      passwordConfirmation: 'motdepasse123',
+    })
+    second.assertStatus(200)
+    const secondUser = await User.findByOrFail('email', 'second@example.com')
+    assert.isFalse(Boolean(secondUser.isAdmin))
+    const refused = await client.post('/api/v1/import').loginAs(secondUser).json({})
+    refused.assertStatus(403)
   })
 
   test('supprimer un rangement garde les exemplaires', async ({ assert, client }) => {
     await loadFixture()
-    const box = await client.post('/api/v1/storage-locations').json({ name: 'Boîte' })
+    const box = await client.post('/api/v1/storage-locations').loginAs(user).json({ name: 'Boîte' })
     await client
       .post('/api/v1/copies')
+      .loginAs(user)
       .json({ cardId: 'TST-004', storageLocationId: (box.body() as any).id })
-    const del = await client.delete(`/api/v1/storage-locations/${(box.body() as any).id}`)
+    const del = await client
+      .delete(`/api/v1/storage-locations/${(box.body() as any).id}`)
+      .loginAs(user)
     del.assertStatus(204)
-    const copies = await client.get('/api/v1/copies').qs({ storageLocationId: 'none' })
+    const copies = await client
+      .get('/api/v1/copies')
+      .loginAs(user)
+      .qs({ storageLocationId: 'none' })
     assert.lengthOf(copies.body() as any, 1)
+  })
+})
+
+test.group('Import RiftCodex', () => {
+  test('convertit une carte RiftCodex au format interne', async ({ assert }) => {
+    const { toCardDTO } = await import('#services/riftcodex_api')
+    const dto = toCardDTO({
+      id: 'abc',
+      name: 'Blade Twirler',
+      riftbound_id: 'ven-002-166',
+      tcgplayer_id: null,
+      collector_number: 2,
+      attributes: { energy: 4, might: 4, power: null },
+      classification: { type: 'Unit', supertype: null, rarity: 'Common', domain: ['Fury'] },
+      text: { rich: '<p>x</p>', plain: 'Texte', flavour: null },
+      set: { set_id: 'VEN', label: 'Vendetta' },
+      media: { image_url: 'https://img/1.png', artist: 'Six More Vodka', accessibility_text: null },
+      tags: ['Yordle'],
+      orientation: 'portrait',
+      metadata: {
+        clean_name: null,
+        updated_on: null,
+        alternate_art: false,
+        overnumbered: false,
+        signature: false,
+      },
+    })
+    assert.equal(dto.id, 'VEN-002-166')
+    assert.equal(dto.set, 'VEN')
+    assert.equal(dto.faction, 'Fury')
+    assert.equal(dto.stats?.energy, 4)
+    assert.equal(dto.art?.fullURL, 'https://img/1.png')
+    assert.deepEqual(dto.tags, ['Yordle'])
   })
 })

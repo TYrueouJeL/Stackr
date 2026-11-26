@@ -17,9 +17,9 @@ const query = computed(() => Object.fromEntries(Object.entries(filters).filter((
 watch(query, (q) => router.replace({ query: q }))
 watch(() => [filters.q, filters.set, filters.rarity, filters.type, filters.faction, filters.owned], () => (filters.page = 1))
 
-const { data: sets } = await useFetch<SetSummary[]>('/api/v1/sets', { default: () => [] })
-const { data: options } = await useFetch<{ rarities: string[]; types: string[]; factions: string[] }>('/api/v1/cards/filters')
-const { data: result } = await useFetch<Paginated<Card>>('/api/v1/cards', { query: computed(() => ({ ...filters, perPage: 60 })) })
+const { data: sets } = await useApiFetch<SetSummary[]>('/sets', { default: () => [] })
+const { data: options } = await useApiFetch<{ rarities: string[]; types: string[]; factions: string[] }>('/cards/filters')
+const { data: result } = await useApiFetch<Paginated<Card>>('/cards', { query: computed(() => ({ ...filters, perPage: 60 })) })
 </script>
 
 <template>

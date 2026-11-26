@@ -80,3 +80,7 @@ th { color: var(--muted); font-weight: 500; font-size: .85rem; }
 .toast.error { border-color: var(--danger); }
 .empty { padding: 2rem; text-align: center; color: var(--muted); }
 .sel { outline: 2px solid var(--accent); }
+.nav .spacer { flex: 1; }
+.auth-box { max-width: 420px; margin: 3rem auto; }
+.auth-box input { width: 100%; }
+.error { color: var(--danger); margin: 0; }

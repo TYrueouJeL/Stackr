@@ -31,40 +31,51 @@ router
       .as('profile')
       .use(middleware.auth())
 
-    // Import des cartes depuis l'API Riot
-    router.get('import', [controllers.Import, 'status']).as('import.status')
-    router.post('import', [controllers.Import, 'store']).as('import.run')
-
-    // Catalogue
-    router.get('sets', [controllers.Sets, 'index']).as('sets.index')
-    router.get('sets/:id', [controllers.Sets, 'show']).as('sets.show')
-    router.get('cards', [controllers.Cards, 'index']).as('cards.index')
-    router.get('cards/filters', [controllers.Cards, 'filters']).as('cards.filters')
-    router.get('cards/:id', [controllers.Cards, 'show']).as('cards.show')
-
-    // Exemplaires physiques
-    router.get('copies', [controllers.Copies, 'index']).as('copies.index')
-    router.post('copies', [controllers.Copies, 'store']).as('copies.store')
-    router.patch('copies', [controllers.Copies, 'bulkUpdate']).as('copies.bulk')
-    router.patch('copies/:id', [controllers.Copies, 'update']).as('copies.update')
-    router.delete('copies/:id', [controllers.Copies, 'destroy']).as('copies.destroy')
-
-    // Rangements
+    // Toutes les routes suivantes nécessitent d'être connecté
     router
-      .resource('storage-locations', controllers.StorageLocations)
-      .apiOnly()
-      .as('storage_locations')
+      .group(() => {
+        // Mise à jour du catalogue (RiftCodex ou API Riot)
+        router.get('import', [controllers.Import, 'status']).as('import.status')
+        router.post('import', [controllers.Import, 'store']).as('import.run')
 
-    // Decklists
-    router.resource('decklists', controllers.Decklists).apiOnly()
-    router.put('decklists/:id/entries', [controllers.Decklists, 'setEntry']).as('decklists.entry')
-    router
-      .post('decklists/:id/import', [controllers.Decklists, 'importText'])
-      .as('decklists.import')
-    router.get('decklists/:id/export', [controllers.Decklists, 'exportText']).as('decklists.export')
-    router
-      .post('decklists/:id/auto-assign', [controllers.Decklists, 'autoAssign'])
-      .as('decklists.auto_assign')
-    router.post('decklists/:id/release', [controllers.Decklists, 'release']).as('decklists.release')
+        // Catalogue
+        router.get('sets', [controllers.Sets, 'index']).as('sets.index')
+        router.get('sets/:id', [controllers.Sets, 'show']).as('sets.show')
+        router.get('cards', [controllers.Cards, 'index']).as('cards.index')
+        router.get('cards/filters', [controllers.Cards, 'filters']).as('cards.filters')
+        router.get('cards/:id', [controllers.Cards, 'show']).as('cards.show')
+
+        // Exemplaires physiques
+        router.get('copies', [controllers.Copies, 'index']).as('copies.index')
+        router.post('copies', [controllers.Copies, 'store']).as('copies.store')
+        router.patch('copies', [controllers.Copies, 'bulkUpdate']).as('copies.bulk')
+        router.patch('copies/:id', [controllers.Copies, 'update']).as('copies.update')
+        router.delete('copies/:id', [controllers.Copies, 'destroy']).as('copies.destroy')
+
+        // Rangements
+        router
+          .resource('storage-locations', controllers.StorageLocations)
+          .apiOnly()
+          .as('storage_locations')
+
+        // Decklists
+        router.resource('decklists', controllers.Decklists).apiOnly()
+        router
+          .put('decklists/:id/entries', [controllers.Decklists, 'setEntry'])
+          .as('decklists.entry')
+        router
+          .post('decklists/:id/import', [controllers.Decklists, 'importText'])
+          .as('decklists.import')
+        router
+          .get('decklists/:id/export', [controllers.Decklists, 'exportText'])
+          .as('decklists.export')
+        router
+          .post('decklists/:id/auto-assign', [controllers.Decklists, 'autoAssign'])
+          .as('decklists.auto_assign')
+        router
+          .post('decklists/:id/release', [controllers.Decklists, 'release'])
+          .as('decklists.release')
+      })
+      .use(middleware.auth())
   })
   .prefix('/api/v1')

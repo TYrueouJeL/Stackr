@@ -3,7 +3,7 @@ import type { Card, Copy, DecklistDetail } from '~/utils/types'
 
 const route = useRoute()
 const id = computed(() => Number(route.params.id))
-const { data: deck, refresh } = await useFetch<DecklistDetail>(() => `/api/v1/decklists/${id.value}`)
+const { data: deck, refresh } = await useApiFetch<DecklistDetail>(() => `/decklists/${id.value}`)
 const { show } = useToast()
 const { refresh: refreshRefs } = useRefs()
 onMounted(() => refreshRefs())

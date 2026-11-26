@@ -33,7 +33,7 @@ export class AuthAccessTokenSchema extends BaseModel {
 }
 
 export class CardCopySchema extends BaseModel {
-  static $columns = ['cardId', 'condition', 'createdAt', 'decklistId', 'foil', 'id', 'language', 'notes', 'storageLocationId', 'updatedAt'] as const
+  static $columns = ['cardId', 'condition', 'createdAt', 'decklistId', 'foil', 'id', 'language', 'notes', 'storageLocationId', 'updatedAt', 'userId'] as const
   $columns = CardCopySchema.$columns
   @column()
   declare cardId: string
@@ -55,6 +55,8 @@ export class CardCopySchema extends BaseModel {
   declare storageLocationId: number | null
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
+  @column()
+  declare userId: number | null
 }
 
 export class CardSetSchema extends BaseModel {
@@ -137,7 +139,7 @@ export class DecklistEntrySchema extends BaseModel {
 }
 
 export class DecklistSchema extends BaseModel {
-  static $columns = ['createdAt', 'description', 'id', 'name', 'updatedAt'] as const
+  static $columns = ['createdAt', 'description', 'id', 'name', 'updatedAt', 'userId'] as const
   $columns = DecklistSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -149,10 +151,12 @@ export class DecklistSchema extends BaseModel {
   declare name: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
+  @column()
+  declare userId: number | null
 }
 
 export class StorageLocationSchema extends BaseModel {
-  static $columns = ['createdAt', 'description', 'id', 'name', 'updatedAt'] as const
+  static $columns = ['createdAt', 'description', 'id', 'name', 'updatedAt', 'userId'] as const
   $columns = StorageLocationSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -164,10 +168,12 @@ export class StorageLocationSchema extends BaseModel {
   declare name: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
+  @column()
+  declare userId: number | null
 }
 
 export class UserSchema extends BaseModel {
-  static $columns = ['createdAt', 'email', 'fullName', 'id', 'password', 'updatedAt'] as const
+  static $columns = ['createdAt', 'email', 'fullName', 'id', 'isAdmin', 'password', 'updatedAt'] as const
   $columns = UserSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -177,6 +183,8 @@ export class UserSchema extends BaseModel {
   declare fullName: string | null
   @column({ isPrimary: true })
   declare id: number
+  @column()
+  declare isAdmin: boolean
   @column({ serializeAs: null })
   declare password: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })

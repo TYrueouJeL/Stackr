@@ -7,19 +7,22 @@ export default class SetsController {
   /**
    * Liste des extensions avec la complétion du masterset
    */
-  async index({}: HttpContext) {
+  async index({ auth }: HttpContext) {
+    const userId = auth.getUserOrFail().id
     const rows = await db
       .from('card_sets as s')
       .select('s.id', 's.name', 's.position')
       .select(db.raw('(select count(*) from cards c where c.set_id = s.id) as total_cards'))
       .select(
         db.raw(
-          '(select count(distinct cc.card_id) from card_copies cc join cards c on c.id = cc.card_id where c.set_id = s.id) as owned_cards'
+          '(select count(distinct cc.card_id) from card_copies cc join cards c on c.id = cc.card_id where c.set_id = s.id and cc.user_id = ?) as owned_cards',
+          [userId]
         )
       )
       .select(
         db.raw(
-          '(select count(*) from card_copies cc join cards c on c.id = cc.card_id where c.set_id = s.id) as total_copies'
+          '(select count(*) from card_copies cc join cards c on c.id = cc.card_id where c.set_id = s.id and cc.user_id = ?) as total_copies',
+          [userId]
         )
       )
       .orderBy('s.position')
@@ -42,13 +45,14 @@ export default class SetsController {
   /**
    * Détail d'une extension : toutes ses cartes et la quantité possédée
    */
-  async show({ params, response }: HttpContext) {
+  async show({ auth, params, response }: HttpContext) {
+    const userId = auth.getUserOrFail().id
     const set = await CardSet.find(params.id)
     if (!set) return response.notFound({ message: 'Extension introuvable' })
 
     const cards = await Card.query()
       .where('set_id', set.id)
-      .withCount('copies', (q) => q.as('owned'))
+      .withCount('copies', (q) => q.where('user_id', userId).as('owned'))
       .orderByRaw('collector_number is null, collector_number')
       .orderBy('name')
 

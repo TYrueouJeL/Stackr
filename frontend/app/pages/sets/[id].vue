@@ -2,7 +2,7 @@
 import type { SetDetail } from '~/utils/types'
 
 const route = useRoute()
-const { data: set, refresh } = await useFetch<SetDetail>(() => `/api/v1/sets/${encodeURIComponent(String(route.params.id))}`)
+const { data: set, refresh } = await useApiFetch<SetDetail>(() => `/sets/${encodeURIComponent(String(route.params.id))}`)
 const { show } = useToast()
 
 const filter = ref<'all' | 'owned' | 'missing'>('all')

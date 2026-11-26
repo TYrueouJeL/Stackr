@@ -8,19 +8,22 @@ export default class CardsController {
   /**
    * Recherche de cartes. Filtres : q, set, rarity, type, faction, owned (yes|no)
    */
-  async index({ request }: HttpContext) {
+  async index({ auth, request }: HttpContext) {
+    const userId = auth.getUserOrFail().id
     const { q, set, rarity, type, faction, owned } = request.qs()
     const page = Math.max(1, Number(request.input('page', 1)) || 1)
     const perPage = Math.min(200, Math.max(1, Number(request.input('perPage', 60)) || 60))
 
-    const query = Card.query().withCount('copies', (sub) => sub.as('owned'))
+    const query = Card.query().withCount('copies', (sub) =>
+      sub.where('user_id', userId).as('owned')
+    )
     if (q) query.whereILike('name', `%${q}%`)
     if (set) query.where('set_id', set)
     if (rarity) query.where('rarity', rarity)
     if (type) query.where('type', type)
     if (faction) query.where('faction', faction)
-    if (owned === 'yes') query.has('copies')
-    if (owned === 'no') query.doesntHave('copies')
+    if (owned === 'yes') query.whereHas('copies', (sub) => sub.where('user_id', userId))
+    if (owned === 'no') query.whereDoesntHave('copies', (sub) => sub.where('user_id', userId))
 
     const result = await query
       .orderBy('set_id')
@@ -49,17 +52,22 @@ export default class CardsController {
     }
   }
 
-  async show({ params, response }: HttpContext) {
+  async show({ auth, params, response }: HttpContext) {
+    const userId = auth.getUserOrFail().id
     const card = await Card.query().where('id', params.id).preload('set').first()
     if (!card) return response.notFound({ message: 'Carte introuvable' })
 
     const copies = await CardCopy.query()
       .where('card_id', card.id)
+      .where('user_id', userId)
       .preload('storageLocation')
       .preload('decklist')
       .orderBy('id')
 
-    const decklists = await DecklistEntry.query().where('card_id', card.id).preload('decklist')
+    const decklists = await DecklistEntry.query()
+      .where('card_id', card.id)
+      .whereHas('decklist', (q) => q.where('user_id', userId))
+      .preload('decklist')
 
     return {
       ...card.toApi(),

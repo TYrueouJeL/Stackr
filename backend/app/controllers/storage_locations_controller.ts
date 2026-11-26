@@ -4,11 +4,16 @@ import CardCopy from '#models/card_copy'
 import { storageLocationValidator } from '#validators/stock'
 
 export default class StorageLocationsController {
-  async index({}: HttpContext) {
+  async index({ auth }: HttpContext) {
+    const userId = auth.getUserOrFail().id
     const locations = await StorageLocation.query()
+      .where('user_id', userId)
       .withCount('copies', (q) => q.as('copies'))
       .orderBy('name')
-    const unassigned = await CardCopy.query().whereNull('storage_location_id').count('* as total')
+    const unassigned = await CardCopy.query()
+      .where('user_id', userId)
+      .whereNull('storage_location_id')
+      .count('* as total')
     return {
       locations: locations.map((l) => ({
         id: l.id,
@@ -20,15 +25,14 @@ export default class StorageLocationsController {
     }
   }
 
-  async store({ request, response }: HttpContext) {
-    const location = await StorageLocation.create(
-      await request.validateUsing(storageLocationValidator)
-    )
+  async store({ auth, request, response }: HttpContext) {
+    const data = await request.validateUsing(storageLocationValidator)
+    const location = await StorageLocation.create({ ...data, userId: auth.getUserOrFail().id })
     return response.created(location)
   }
 
-  async show({ params }: HttpContext) {
-    const location = await StorageLocation.findOrFail(params.id)
+  async show({ auth, params }: HttpContext) {
+    const location = await this.find(auth.getUserOrFail().id, params.id)
     const copies = await CardCopy.query()
       .where('storage_location_id', location.id)
       .preload('card')
@@ -43,8 +47,8 @@ export default class StorageLocationsController {
     }
   }
 
-  async update({ params, request }: HttpContext) {
-    const location = await StorageLocation.findOrFail(params.id)
+  async update({ auth, params, request }: HttpContext) {
+    const location = await this.find(auth.getUserOrFail().id, params.id)
     location.merge(await request.validateUsing(storageLocationValidator))
     await location.save()
     return location
@@ -53,12 +57,16 @@ export default class StorageLocationsController {
   /**
    * Supprime le rangement ; ses exemplaires deviennent "sans rangement"
    */
-  async destroy({ params, response }: HttpContext) {
-    const location = await StorageLocation.findOrFail(params.id)
+  async destroy({ auth, params, response }: HttpContext) {
+    const location = await this.find(auth.getUserOrFail().id, params.id)
     await CardCopy.query()
       .where('storage_location_id', location.id)
       .update({ storage_location_id: null })
     await location.delete()
     return response.noContent()
+  }
+
+  private find(userId: number, id: unknown) {
+    return StorageLocation.query().where({ id, user_id: userId }).firstOrFail()
   }
 }

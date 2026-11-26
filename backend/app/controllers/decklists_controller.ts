@@ -12,8 +12,9 @@ import {
 } from '#validators/stock'
 
 export default class DecklistsController {
-  async index({}: HttpContext) {
+  async index({ auth }: HttpContext) {
     const decklists = await Decklist.query()
+      .where('user_id', auth.getUserOrFail().id)
       .withAggregate('entries', (q) => q.sum('quantity').as('total_cards'))
       .withCount('copies', (q) => q.as('assigned'))
       .orderBy('name')
@@ -31,8 +32,9 @@ export default class DecklistsController {
     })
   }
 
-  async store({ request, response }: HttpContext) {
-    const decklist = await Decklist.create(await request.validateUsing(decklistValidator))
+  async store({ auth, request, response }: HttpContext) {
+    const data = await request.validateUsing(decklistValidator)
+    const decklist = await Decklist.create({ ...data, userId: auth.getUserOrFail().id })
     return response.created(decklist)
   }
 
@@ -40,8 +42,8 @@ export default class DecklistsController {
    * Détail : pour chaque carte de la liste, combien sont demandées, quels
    * exemplaires sont affectés et combien d'exemplaires libres sont disponibles
    */
-  async show({ params }: HttpContext) {
-    const decklist = await Decklist.findOrFail(params.id)
+  async show({ auth, params }: HttpContext) {
+    const decklist = await this.find(auth.getUserOrFail().id, params.id)
     const entries = await DecklistEntry.query().where('decklist_id', decklist.id).preload('card')
     const copies = await CardCopy.query()
       .where('decklist_id', decklist.id)
@@ -56,6 +58,7 @@ export default class DecklistsController {
           .select('card_id')
           .count('* as free')
           .whereIn('card_id', cardIds)
+          .where('user_id', decklist.userId!)
           .whereNull('decklist_id')
           .groupBy('card_id')
       : []
@@ -95,8 +98,8 @@ export default class DecklistsController {
     }
   }
 
-  async update({ params, request }: HttpContext) {
-    const decklist = await Decklist.findOrFail(params.id)
+  async update({ auth, params, request }: HttpContext) {
+    const decklist = await this.find(auth.getUserOrFail().id, params.id)
     decklist.merge(await request.validateUsing(decklistValidator))
     await decklist.save()
     return decklist
@@ -105,8 +108,8 @@ export default class DecklistsController {
   /**
    * Supprime la decklist ; ses exemplaires redeviennent libres
    */
-  async destroy({ params, response }: HttpContext) {
-    const decklist = await Decklist.findOrFail(params.id)
+  async destroy({ auth, params, response }: HttpContext) {
+    const decklist = await this.find(auth.getUserOrFail().id, params.id)
     await db.from('card_copies').where('decklist_id', decklist.id).update({ decklist_id: null })
     await decklist.delete()
     return response.noContent()
@@ -115,8 +118,8 @@ export default class DecklistsController {
   /**
    * Ajoute/modifie une carte de la liste (quantity = 0 la retire)
    */
-  async setEntry({ params, request }: HttpContext) {
-    const decklist = await Decklist.findOrFail(params.id)
+  async setEntry({ auth, params, request }: HttpContext) {
+    const decklist = await this.find(auth.getUserOrFail().id, params.id)
     const { cardId, quantity } = await request.validateUsing(decklistEntryValidator)
     if (quantity === 0) {
       await DecklistEntry.query().where({ decklist_id: decklist.id, card_id: cardId }).delete()
@@ -132,8 +135,8 @@ export default class DecklistsController {
   /**
    * Importe une liste texte ("3 Nom de carte" ou "3x ID") dans la decklist
    */
-  async importText({ params, request }: HttpContext) {
-    const decklist = await Decklist.findOrFail(params.id)
+  async importText({ auth, params, request }: HttpContext) {
+    const decklist = await this.find(auth.getUserOrFail().id, params.id)
     const { text, replace } = await request.validateUsing(decklistImportValidator)
 
     const wanted = new Map<string, number>()
@@ -174,8 +177,8 @@ export default class DecklistsController {
   /**
    * Affecte automatiquement des exemplaires libres aux cartes manquantes
    */
-  async autoAssign({ params }: HttpContext) {
-    const decklist = await Decklist.findOrFail(params.id)
+  async autoAssign({ auth, params }: HttpContext) {
+    const decklist = await this.find(auth.getUserOrFail().id, params.id)
     const entries = await DecklistEntry.query().where('decklist_id', decklist.id)
     let assigned = 0
 
@@ -190,6 +193,7 @@ export default class DecklistsController {
         const freeIds = await trx
           .from('card_copies')
           .where('card_id', entry.cardId)
+          .where('user_id', decklist.userId!)
           .whereNull('decklist_id')
           .orderBy('foil', 'asc')
           .orderBy('id', 'asc')
@@ -216,8 +220,8 @@ export default class DecklistsController {
   /**
    * Libère tous les exemplaires affectés à la decklist
    */
-  async release({ params }: HttpContext) {
-    const decklist = await Decklist.findOrFail(params.id)
+  async release({ auth, params }: HttpContext) {
+    const decklist = await this.find(auth.getUserOrFail().id, params.id)
     const released = await db
       .from('card_copies')
       .where('decklist_id', decklist.id)
@@ -225,13 +229,17 @@ export default class DecklistsController {
     return { released: Array.isArray(released) ? released.length : released }
   }
 
-  async exportText({ params, response }: HttpContext) {
-    const decklist = await Decklist.findOrFail(params.id)
+  async exportText({ auth, params, response }: HttpContext) {
+    const decklist = await this.find(auth.getUserOrFail().id, params.id)
     const entries = await DecklistEntry.query().where('decklist_id', decklist.id).preload('card')
     const text = entries
       .sort((a, b) => a.card.name.localeCompare(b.card.name))
       .map((e) => `${e.quantity} ${e.card.name}`)
       .join('\n')
     return response.header('content-type', 'text/plain; charset=utf-8').send(text)
+  }
+
+  private find(userId: number, id: unknown) {
+    return Decklist.query().where({ id, user_id: userId }).firstOrFail()
   }
 }

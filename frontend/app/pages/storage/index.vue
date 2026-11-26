@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { StorageLocation } from '~/utils/types'
 
-const { data, refresh } = await useFetch<{ locations: StorageLocation[]; unassigned: number }>('/api/v1/storage-locations')
+const { data, refresh } = await useApiFetch<{ locations: StorageLocation[]; unassigned: number }>('/storage-locations')
 const form = reactive({ name: '', description: '' })
 const { show } = useToast()
 

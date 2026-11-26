@@ -31,6 +31,8 @@ export interface CardDTO {
   art?: CardArtDTO | null
   flavorText?: string | null
   tags?: string[] | null
+  /** Données brutes de la source (conservées dans cards.raw) */
+  raw?: unknown
 }
 
 export interface SetDTO {

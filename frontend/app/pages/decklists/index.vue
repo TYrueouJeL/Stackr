@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DecklistSummary } from '~/utils/types'
 
-const { data: decklists, refresh } = await useFetch<DecklistSummary[]>('/api/v1/decklists', { default: () => [] })
+const { data: decklists, refresh } = await useApiFetch<DecklistSummary[]>('/decklists', { default: () => [] })
 const name = ref('')
 const { show } = useToast()
 
@@ -25,7 +25,7 @@ async function create() {
       <input v-model="name" placeholder="Nom de la nouvelle decklist" />
       <button class="primary">Créer</button>
     </form>
-    <div v-if="!decklists.length" class="panel empty">Aucune decklist pour l'instant.</div>
+    <div v-if="!decklists?.length" class="panel empty">Aucune decklist pour l'instant.</div>
     <div class="grid sets">
       <NuxtLink v-for="d in decklists" :key="d.id" :to="`/decklists/${d.id}`" class="panel stack" style="color: var(--text)">
         <div class="row between">

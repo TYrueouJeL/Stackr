@@ -2,17 +2,19 @@
 import type { SetSummary } from '~/utils/types'
 
 const { show } = useToast()
-const { data: sets, refresh } = await useFetch<SetSummary[]>('/api/v1/sets', { default: () => [] })
-const { data: status, refresh: refreshStatus } = await useFetch<{
+const { data: sets, refresh } = await useApiFetch<SetSummary[]>('/sets', { default: () => [] })
+const { data: status, refresh: refreshStatus } = await useApiFetch<{
   sets: number
   cards: number
   copies: number
   lastImport: string | null
+  source: 'riftcodex' | 'riot'
   apiKeyConfigured: boolean
-}>('/api/v1/import')
+  canImport: boolean
+}>('/import')
 
 const importing = ref(false)
-const locale = ref('en')
+const source = ref<'riftcodex' | 'riot'>(status.value?.source ?? 'riftcodex')
 
 const totals = computed(() => {
   const all = sets.value ?? []
@@ -24,7 +26,7 @@ const totals = computed(() => {
 async function runImport() {
   importing.value = true
   try {
-    const res = await api<{ cards: number; sets: number }>('/import', { method: 'POST', body: { locale: locale.value } })
+    const res = await api<{ cards: number; sets: number }>('/import', { method: 'POST', body: { source: source.value } })
     show(`${res.cards} cartes importées dans ${res.sets} extensions`)
     await Promise.all([refresh(), refreshStatus()])
   } catch (e) {
@@ -39,18 +41,18 @@ async function runImport() {
   <div>
     <div class="row between">
       <h1>Masterset Riftbound</h1>
-      <div class="row">
-        <select v-model="locale" title="Langue des cartes">
-          <option value="en">Anglais</option>
-          <option value="fr">Français</option>
+      <div v-if="status?.canImport" class="row">
+        <select v-model="source" title="Source des cartes">
+          <option value="riftcodex">RiftCodex (communautaire)</option>
+          <option value="riot">API officielle Riot</option>
         </select>
         <button class="primary" :disabled="importing" @click="runImport">
-          {{ importing ? 'Import en cours…' : 'Mettre à jour les cartes depuis Riot' }}
+          {{ importing ? 'Import en cours…' : 'Mettre à jour le catalogue' }}
         </button>
       </div>
     </div>
 
-    <p v-if="status && !status.apiKeyConfigured" class="panel" style="border-color: var(--warn)">
+    <p v-if="status?.canImport && source === 'riot' && !status.apiKeyConfigured" class="panel" style="border-color: var(--warn)">
       Aucune clé API Riot n'est configurée. Ajoute <code>RIOT_API_KEY</code> dans <code>backend/.env</code>.
     </p>
 
@@ -61,8 +63,9 @@ async function runImport() {
     </div>
 
     <div v-if="!sets?.length" class="panel empty">
-      Aucune carte en base. Lance l'import depuis l'API Riot avec le bouton ci-dessus
-      ou <code>node ace riftbound:import</code> dans le dossier backend.
+      Aucune carte en base.
+      <template v-if="status?.canImport">Lance l'import avec le bouton ci-dessus ou <code>node ace riftbound:import</code> dans le dossier backend.</template>
+      <template v-else>Un administrateur doit d'abord importer le catalogue.</template>
     </div>
 
     <div class="grid sets">
