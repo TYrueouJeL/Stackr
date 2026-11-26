@@ -1,6 +1,7 @@
 import { DecklistSchema } from '#database/schema'
-import { hasMany } from '@adonisjs/lucid/orm'
-import type { HasMany } from '@adonisjs/lucid/types/relations'
+import { belongsTo, hasMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
+import StorageLocation from '#models/storage_location'
 import DecklistEntry from '#models/decklist_entry'
 import CardCopy from '#models/card_copy'
 
@@ -12,4 +13,7 @@ export default class Decklist extends DecklistSchema {
 
   @hasMany(() => CardCopy)
   declare copies: HasMany<typeof CardCopy>
+
+  @belongsTo(() => StorageLocation)
+  declare storageLocation: BelongsTo<typeof StorageLocation>
 }

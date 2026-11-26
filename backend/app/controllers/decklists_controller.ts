@@ -4,6 +4,8 @@ import db from '@adonisjs/lucid/services/db'
 import Decklist from '#models/decklist'
 import DecklistEntry from '#models/decklist_entry'
 import CardCopy from '#models/card_copy'
+import { assertOwnedTargets } from '#services/ownership'
+import { leaveDeckBox, moveDeckBox, storeInDeckBox } from '#services/deck_storage'
 import {
   SECTIONS,
   type Section,
@@ -24,6 +26,7 @@ export default class DecklistsController {
       .where('user_id', auth.getUserOrFail().id)
       .withAggregate('entries', (q) => q.sum('quantity').as('total_cards'))
       .withCount('copies', (q) => q.as('assigned'))
+      .preload('storageLocation')
       .orderBy('name')
 
     // Aperçu : la légende du deck, ses couleurs (domaines) et quelques illustrations
@@ -109,14 +112,19 @@ export default class DecklistsController {
         totalCards: total,
         assignedCopies: assigned,
         complete: total > 0 && assigned >= total,
+        storageLocation: d.storageLocation
+          ? { id: d.storageLocation.id, name: d.storageLocation.name }
+          : null,
         ...(previews.get(d.id) ?? { legend: null, domains: [], images: [] }),
       }
     })
   }
 
   async store({ auth, request, response }: HttpContext) {
+    const userId = auth.getUserOrFail().id
     const data = await request.validateUsing(decklistValidator)
-    const decklist = await Decklist.create({ ...data, userId: auth.getUserOrFail().id })
+    await assertOwnedTargets(userId, data)
+    const decklist = await Decklist.create({ ...data, userId })
     return response.created(decklist)
   }
 
@@ -183,6 +191,9 @@ export default class DecklistsController {
       id: decklist.id,
       name: decklist.name,
       description: decklist.description,
+      storageLocation: decklist.storageLocation
+        ? { id: decklist.storageLocation.id, name: decklist.storageLocation.name }
+        : null,
       totalCards,
       assignedCopies: assignedCount,
       missingCards: rows.reduce((s, r) => s + r.missing, 0),
@@ -193,9 +204,19 @@ export default class DecklistsController {
   }
 
   async update({ auth, params, request }: HttpContext) {
-    const decklist = await this.find(auth.getUserOrFail().id, params.id)
-    decklist.merge(await request.validateUsing(decklistValidator))
-    await decklist.save()
+    const userId = auth.getUserOrFail().id
+    const decklist = await this.find(userId, params.id)
+    const data = await request.validateUsing(decklistValidator)
+    await assertOwnedTargets(userId, data)
+    const oldBox = decklist.storageLocationId ?? null
+    await db.transaction(async (trx) => {
+      decklist.useTransaction(trx)
+      decklist.merge(data)
+      await decklist.save()
+      if (data.storageLocationId !== undefined) {
+        await moveDeckBox(decklist.id, oldBox, data.storageLocationId, trx)
+      }
+    })
     return decklist
   }
 
@@ -204,8 +225,11 @@ export default class DecklistsController {
    */
   async destroy({ auth, params, response }: HttpContext) {
     const decklist = await this.find(auth.getUserOrFail().id, params.id)
-    await db.from('card_copies').where('decklist_id', decklist.id).update({ decklist_id: null })
-    await decklist.delete()
+    await db.transaction(async (trx) => {
+      await leaveDeckBox(await this.copyIds(decklist.id, trx), trx)
+      await trx.from('card_copies').where('decklist_id', decklist.id).update({ decklist_id: null })
+      await trx.from('decklists').where('id', decklist.id).delete()
+    })
     return response.noContent()
   }
 
@@ -325,6 +349,10 @@ export default class DecklistsController {
             decklist_id: decklist.id,
             updated_at: DateTime.utc().toSQL({ includeOffset: false }),
           })
+        await storeInDeckBox(
+          freeIds.map((r) => r.id),
+          trx
+        )
         assigned += freeIds.length
       }
     })
@@ -337,11 +365,20 @@ export default class DecklistsController {
    */
   async release({ auth, params }: HttpContext) {
     const decklist = await this.find(auth.getUserOrFail().id, params.id)
-    const released = await db
-      .from('card_copies')
-      .where('decklist_id', decklist.id)
-      .update({ decklist_id: null, updated_at: DateTime.utc().toSQL({ includeOffset: false }) })
-    return { released: Array.isArray(released) ? released.length : released }
+    const ids = await this.copyIds(decklist.id)
+    await db.transaction(async (trx) => {
+      await leaveDeckBox(ids, trx)
+      await trx
+        .from('card_copies')
+        .whereIn('id', ids)
+        .update({ decklist_id: null, updated_at: DateTime.utc().toSQL({ includeOffset: false }) })
+    })
+    return { released: ids.length }
+  }
+
+  private async copyIds(decklistId: number, client: any = db): Promise<number[]> {
+    const rows = await client.from('card_copies').where('decklist_id', decklistId).select('id')
+    return rows.map((r: { id: number }) => r.id)
   }
 
   async exportText({ auth, params, response }: HttpContext) {
@@ -354,6 +391,6 @@ export default class DecklistsController {
   }
 
   private find(userId: number, id: unknown) {
-    return Decklist.query().where({ id, user_id: userId }).firstOrFail()
+    return Decklist.query().where({ id, user_id: userId }).preload('storageLocation').firstOrFail()
   }
 }

@@ -12,9 +12,9 @@ const { data, refresh } = await useAsyncData(
   async () => {
     if (isNone.value) {
       const copies = await api<Copy[]>('/copies', { query: { storageLocationId: 'none' } })
-      return { id: null as number | null, name: 'Sans rangement', description: null as string | null, copies }
+      return { id: null as number | null, name: 'Sans rangement', description: null as string | null, decklists: [] as { id: number; name: string }[], copies }
     }
-    return api<{ id: number; name: string; description: string | null; copies: Copy[] }>(`/storage-locations/${route.params.id}`)
+    return api<{ id: number; name: string; description: string | null; decklists: { id: number; name: string }[]; copies: Copy[] }>(`/storage-locations/${route.params.id}`)
   }
 )
 
@@ -71,6 +71,10 @@ async function remove() {
         <template v-if="!editing">
           <h1>{{ data.name }}</h1>
           <span v-if="data.description" class="muted">{{ data.description }}</span>
+          <span v-if="data.decklists.length" class="small muted">
+            Deck box de
+            <template v-for="(d, i) in data.decklists" :key="d.id"><template v-if="i">, </template><NuxtLink :to="`/decklists/${d.id}`">{{ d.name }}</NuxtLink></template>
+          </span>
         </template>
         <form v-else class="row" @submit.prevent="save">
           <input v-model="form.name" placeholder="Nom" />

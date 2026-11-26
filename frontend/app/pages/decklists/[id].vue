@@ -5,7 +5,7 @@ const route = useRoute()
 const id = computed(() => Number(route.params.id))
 const { data: deck, refresh } = await useApiFetch<DecklistDetail>(() => `/decklists/${id.value}`)
 const { show } = useToast()
-const { refresh: refreshRefs } = useRefs()
+const { refresh: refreshRefs, locations } = useRefs()
 onMounted(() => refreshRefs())
 
 const importText = ref('')
@@ -85,6 +85,22 @@ async function exportList() {
   show('Liste copiée dans le presse-papier')
 }
 
+const storageId = computed(() => deck.value?.storageLocation?.id ?? null)
+
+async function setStorage(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  const storageLocationId = value ? Number(value) : null
+  if (!deck.value) return
+  await call(
+    `/decklists/${id.value}`,
+    { method: 'PUT', body: { name: deck.value.name, description: deck.value.description, storageLocationId } },
+    () =>
+      storageLocationId
+        ? `Deck rangé dans « ${locations.value.find((l) => l.id === storageLocationId)?.name ?? ''} », ses exemplaires y ont été déplacés`
+        : 'Le deck n’a plus de rangement, ses exemplaires sont retournés à leur place'
+  )
+}
+
 async function save() {
   await call(`/decklists/${id.value}`, { method: 'PUT', body: form }, () => 'Decklist enregistrée')
   editing.value = false
@@ -133,6 +149,15 @@ async function assign(copyId: number, decklistId: number | null) {
             <span v-else-if="deck.totalCards" class="tag ok">✓ Deck complet</span>
             <span class="tag">{{ deck.totalCards }} cartes</span>
           </div>
+          <label class="inline small muted deck-box">
+            📦 Rangé dans
+            <select :value="storageId ?? ''" @change="setStorage">
+              <option value="">Aucun rangement</option>
+              <option v-for="l in locations" :key="l.id" :value="l.id">{{ l.name }}</option>
+            </select>
+            <NuxtLink v-if="deck.storageLocation" :to="`/storage/${deck.storageLocation.id}`" class="tiny">voir</NuxtLink>
+          </label>
+          <span v-if="deck.storageLocation" class="tiny faint">Les exemplaires mis dans ce deck y sont rangés automatiquement, et retournent à leur place quand ils en sortent.</span>
         </div>
         <ProgressRing :value="deck.totalCards ? (deck.assignedCopies / deck.totalCards) * 100 : 0" :size="130" :stroke="10">
           <strong style="font-size: 1.5rem">{{ deck.assignedCopies }}<span class="faint" style="font-size: 0.6em">/{{ deck.totalCards }}</span></strong>
@@ -262,6 +287,8 @@ async function assign(copyId: number, decklistId: number | null) {
 
 <style scoped>
 .deck-section { margin-top: 1.4rem; }
+.deck-box { gap: 0.5rem; margin-top: 0.3rem; }
+.deck-box select { max-width: 240px; }
 .deck-section-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.55rem; }
 .deck-section-head h2 { margin: 0; font-size: 1.15rem; }
 @media (min-width: 760px) {

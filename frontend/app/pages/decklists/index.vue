@@ -67,6 +67,7 @@ async function create() {
           <span class="small" :class="d.legend ? '' : 'faint'">
             <span class="faint">Légende :</span> {{ d.legend?.name ?? 'à choisir' }}
           </span>
+          <span v-if="d.storageLocation" class="small"><span class="faint">Rangé dans :</span> 📦 {{ d.storageLocation.name }}</span>
           <div class="row" style="gap: 0.4rem">
             <span v-for="dom in domainList(d.domains.join(' / '))" :key="dom.name" class="tag" :style="{ color: dom.color, borderColor: `${dom.color}66`, background: `${dom.color}14` }">
               <span class="dot" :style="{ background: dom.color, color: dom.color }" /> {{ dom.name }}

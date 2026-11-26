@@ -63,6 +63,7 @@ export interface StorageLocation {
   name: string
   description: string | null
   copies: number
+  decklists: { id: number; name: string }[]
 }
 
 export interface DecklistSummary {
@@ -72,6 +73,7 @@ export interface DecklistSummary {
   totalCards: number
   assignedCopies: number
   complete: boolean
+  storageLocation: { id: number; name: string } | null
   legend: { id: string; name: string; thumbnailUrl: string | null } | null
   domains: string[]
   images: string[]
@@ -92,6 +94,7 @@ export interface DecklistDetail {
   id: number
   name: string
   description: string | null
+  storageLocation: { id: number; name: string } | null
   totalCards: number
   assignedCopies: number
   missingCards: number

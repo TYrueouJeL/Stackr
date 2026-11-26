@@ -47,6 +47,7 @@ async function create() {
           <span class="name">{{ l.name }}</span>
           <span v-if="l.description" class="small muted ellipsis">{{ l.description }}</span>
           <span class="tiny faint">{{ l.copies }} exemplaire{{ l.copies > 1 ? 's' : '' }}</span>
+          <span v-if="l.decklists?.length" class="tiny muted ellipsis">🃏 {{ l.decklists.map((d) => d.name).join(', ') }}</span>
         </div>
       </NuxtLink>
       <NuxtLink to="/storage/none" class="panel box-tile fade-up" style="border-style: dashed">

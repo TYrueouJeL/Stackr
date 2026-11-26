@@ -33,7 +33,7 @@ export class AuthAccessTokenSchema extends BaseModel {
 }
 
 export class CardCopySchema extends BaseModel {
-  static $columns = ['cardId', 'condition', 'createdAt', 'decklistId', 'foil', 'id', 'language', 'notes', 'storageLocationId', 'updatedAt', 'userId'] as const
+  static $columns = ['cardId', 'condition', 'createdAt', 'decklistId', 'foil', 'id', 'language', 'notes', 'previousStorageLocationId', 'storageLocationId', 'updatedAt', 'userId'] as const
   $columns = CardCopySchema.$columns
   @column()
   declare cardId: string
@@ -51,6 +51,8 @@ export class CardCopySchema extends BaseModel {
   declare language: string
   @column()
   declare notes: string | null
+  @column()
+  declare previousStorageLocationId: number | null
   @column()
   declare storageLocationId: number | null
   @column.dateTime({ autoCreate: true, autoUpdate: true })
@@ -141,7 +143,7 @@ export class DecklistEntrySchema extends BaseModel {
 }
 
 export class DecklistSchema extends BaseModel {
-  static $columns = ['createdAt', 'description', 'id', 'name', 'updatedAt', 'userId'] as const
+  static $columns = ['createdAt', 'description', 'id', 'name', 'storageLocationId', 'updatedAt', 'userId'] as const
   $columns = DecklistSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -151,6 +153,8 @@ export class DecklistSchema extends BaseModel {
   declare id: number
   @column()
   declare name: string
+  @column()
+  declare storageLocationId: number | null
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
   @column()

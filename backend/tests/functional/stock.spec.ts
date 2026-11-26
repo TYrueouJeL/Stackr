@@ -415,3 +415,114 @@ test.group('Decklists par sections', (group) => {
     )
   })
 })
+
+test.group('Rangement des decklists', (group) => {
+  group.each.setup(async () => {
+    const cleanup = await testUtils.db().truncate()
+    user = await User.create({ email: 'ty@example.com', password: 'motdepasse123' })
+    return cleanup
+  })
+
+  test('les exemplaires du deck vont dans sa deck box puis reviennent à leur place', async ({
+    assert,
+    client,
+  }) => {
+    await loadFixture()
+    const location = async (name: string) => {
+      const res = await client.post('/api/v1/storage-locations').loginAs(user).json({ name })
+      return res.body() as any
+    }
+    const binder = await location('Classeur')
+    const box = await location('Deck box')
+    const box2 = await location('Deck box 2')
+
+    await client
+      .post('/api/v1/copies')
+      .loginAs(user)
+      .json({ cardId: 'TST-001', quantity: 2, storageLocationId: binder.id })
+    await client.post('/api/v1/copies').loginAs(user).json({ cardId: 'TST-002' })
+
+    const created = await client
+      .post('/api/v1/decklists')
+      .loginAs(user)
+      .json({ name: 'Deck', storageLocationId: box.id })
+    created.assertStatus(201)
+    const deckId = (created.body() as any).id
+    await client
+      .put(`/api/v1/decklists/${deckId}/entries`)
+      .loginAs(user)
+      .json({ cardId: 'TST-001', quantity: 2 })
+    await client
+      .put(`/api/v1/decklists/${deckId}/entries`)
+      .loginAs(user)
+      .json({ cardId: 'TST-002', quantity: 1 })
+    await client.post(`/api/v1/decklists/${deckId}/auto-assign`).loginAs(user)
+
+    const copies = async () => {
+      const res = await client.get('/api/v1/copies').loginAs(user)
+      return (res.body() as any[]).map((c) => [c.cardId, c.storageLocationId, c.decklistId])
+    }
+    assert.deepEqual(await copies(), [
+      ['TST-001', box.id, deckId],
+      ['TST-001', box.id, deckId],
+      ['TST-002', box.id, deckId],
+    ])
+
+    const detailRes = await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)
+    assert.equal((detailRes.body() as any).storageLocation.name, 'Deck box')
+    const listRes = await client.get('/api/v1/decklists').loginAs(user)
+    assert.equal((listRes.body() as any)[0].storageLocation.id, box.id)
+
+    // Changer de deck box déplace les exemplaires
+    const moved = await client
+      .put(`/api/v1/decklists/${deckId}`)
+      .loginAs(user)
+      .json({ name: 'Deck', storageLocationId: box2.id })
+    moved.assertStatus(200)
+    const afterMove = await copies()
+    assert.deepEqual(
+      afterMove.map((c) => c[1]),
+      [box2.id, box2.id, box2.id]
+    )
+
+    // Retirer un exemplaire le remet dans son rangement d'origine
+    const allRes = await client.get('/api/v1/copies').loginAs(user)
+    const first = (allRes.body() as any[])[0]
+    await client
+      .patch('/api/v1/copies')
+      .loginAs(user)
+      .json({ ids: [first.id], decklistId: null })
+    const afterRemove = await copies()
+    assert.deepEqual(afterRemove[0], ['TST-001', binder.id, null])
+
+    // Libérer le deck : les autres reviennent aussi (le TST-002 n'avait pas de rangement)
+    await client.post(`/api/v1/decklists/${deckId}/release`).loginAs(user)
+    assert.deepEqual(await copies(), [
+      ['TST-001', binder.id, null],
+      ['TST-001', binder.id, null],
+      ['TST-002', null, null],
+    ])
+
+    // Un exemplaire créé directement dans le deck va dans la deck box
+    const direct = await client
+      .post('/api/v1/copies')
+      .loginAs(user)
+      .json({ cardId: 'TST-002', decklistId: deckId })
+    assert.equal((direct.body() as any)[0].storageLocationId, box2.id)
+
+    // Supprimer la deck box retire le rangement du deck
+    await client.delete(`/api/v1/storage-locations/${box2.id}`).loginAs(user)
+    const afterRes = await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)
+    assert.isNull((afterRes.body() as any).storageLocation)
+  })
+
+  test("on ne peut pas utiliser le rangement d'un autre compte", async ({ client }) => {
+    const other = await User.create({ email: 'autre@example.com', password: 'motdepasse123' })
+    const box = await StorageLocation.create({ name: 'Pas à moi', userId: other.id })
+    const res = await client
+      .post('/api/v1/decklists')
+      .loginAs(user)
+      .json({ name: 'Deck', storageLocationId: box.id })
+    res.assertStatus(404)
+  })
+})

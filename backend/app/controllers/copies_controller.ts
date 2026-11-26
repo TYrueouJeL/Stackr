@@ -3,6 +3,7 @@ import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import CardCopy from '#models/card_copy'
 import { assertOwnedTargets } from '#services/ownership'
+import { leaveDeckBox, storeInDeckBox } from '#services/deck_storage'
 import {
   bulkUpdateCopiesValidator,
   createCopiesValidator,
@@ -58,6 +59,14 @@ export default class CopiesController {
           )
         )
       }
+      // Sans rangement choisi, un exemplaire ajouté directement dans un deck va dans sa deck box
+      if (data.decklistId && !data.storageLocationId) {
+        await storeInDeckBox(
+          created.map((c) => c.id),
+          trx
+        )
+        for (const c of created) await c.refresh()
+      }
       return created
     })
     return response.created(copies.map((c) => c.toApi()))
@@ -68,7 +77,10 @@ export default class CopiesController {
     const copy = await CardCopy.query().where({ id: params.id, user_id: userId }).firstOrFail()
     const changes = await request.validateUsing(updateCopyValidator)
     await assertOwnedTargets(userId, changes)
-    copy.merge(changes)
+    await this.moveCopies([copy.id], changes)
+    await copy.refresh()
+    const { storageLocationId, decklistId, ...rest } = changes
+    copy.merge(rest)
     await copy.save()
     return copy.toApi()
   }
@@ -81,18 +93,63 @@ export default class CopiesController {
     const { ids, ...changes } = await request.validateUsing(bulkUpdateCopiesValidator)
     await assertOwnedTargets(userId, changes)
 
-    const update: Record<string, number | null> = {}
-    if (changes.storageLocationId !== undefined)
-      update.storage_location_id = changes.storageLocationId
-    if (changes.decklistId !== undefined) update.decklist_id = changes.decklistId
-    if (Object.keys(update).length) {
-      await db
-        .from('card_copies')
-        .whereIn('id', ids)
-        .where('user_id', userId)
-        .update({ ...update, updated_at: DateTime.utc().toSQL({ includeOffset: false }) })
-    }
-    return { updated: ids.length }
+    const owned = await db
+      .from('card_copies')
+      .whereIn('id', ids)
+      .where('user_id', userId)
+      .select('id')
+    await this.moveCopies(
+      owned.map((r) => r.id),
+      changes
+    )
+    return { updated: owned.length }
+  }
+
+  /**
+   * Change le rangement et/ou la decklist d'exemplaires en gardant la deck box cohérente :
+   * entrer dans un deck qui a un rangement y range l'exemplaire, en sortir le remet à sa place
+   * (sauf si un rangement est donné explicitement).
+   */
+  private async moveCopies(
+    ids: number[],
+    changes: { storageLocationId?: number | null; decklistId?: number | null }
+  ) {
+    if (!ids.length) return
+    const now = () => DateTime.utc().toSQL({ includeOffset: false })
+    const explicitStorage = changes.storageLocationId !== undefined
+    await db.transaction(async (trx) => {
+      if (changes.decklistId !== undefined) {
+        const leaving = await trx
+          .from('card_copies')
+          .whereIn('id', ids)
+          .whereNotNull('decklist_id')
+          .where((q) =>
+            changes.decklistId === null
+              ? q
+              : q.whereNot('decklist_id', changes.decklistId as number)
+          )
+          .select('id')
+        if (!explicitStorage) {
+          await leaveDeckBox(
+            leaving.map((r) => r.id),
+            trx
+          )
+        }
+        await trx
+          .from('card_copies')
+          .whereIn('id', ids)
+          .update({ decklist_id: changes.decklistId, updated_at: now() })
+      }
+      if (explicitStorage) {
+        await trx.from('card_copies').whereIn('id', ids).update({
+          storage_location_id: changes.storageLocationId,
+          previous_storage_location_id: null,
+          updated_at: now(),
+        })
+      } else if (changes.decklistId) {
+        await storeInDeckBox(ids, trx)
+      }
+    })
   }
 
   async destroy({ auth, params, response }: HttpContext) {

@@ -36,6 +36,7 @@ export const storageLocationValidator = vine.create({
 export const decklistValidator = vine.create({
   name: vine.string().trim().minLength(1).maxLength(255),
   description: vine.string().maxLength(5000).nullable().optional(),
+  storageLocationId: vine.number().withoutDecimals().nullable().optional(),
 })
 
 export const decklistEntryValidator = vine.create({

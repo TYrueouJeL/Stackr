@@ -42,7 +42,7 @@ async function submit() {
     <label>Quantité <input v-model.number="form.quantity" type="number" min="1" max="100" style="width: 5rem" /></label>
     <label>Rangement
       <select v-model="form.storageLocationId">
-        <option :value="null">Sans rangement</option>
+        <option :value="null">{{ decklistId ? "Rangement du deck (ou aucun)" : "Sans rangement" }}</option>
         <option v-for="l in locations" :key="l.id" :value="l.id">{{ l.name }}</option>
       </select>
     </label>
