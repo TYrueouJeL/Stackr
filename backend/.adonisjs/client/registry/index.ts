@@ -98,6 +98,12 @@ const routes = {
     tokens: [[0,"api"],[0,"v1"],[0,"copies"],[1,"id"]],
     types: placeholder as Registry['copies.update']['types'],
   },
+  'copies.slot': {
+    methods: ["PUT"],
+    pattern: '/api/v1/copies/:id/slot',
+    tokens: [[0,"api"],[0,"v1"],[0,"copies"],[1,"id"],[0,"slot"]],
+    types: placeholder as Registry['copies.slot']['types'],
+  },
   'copies.destroy': {
     methods: ["DELETE"],
     pattern: '/api/v1/copies/:id',

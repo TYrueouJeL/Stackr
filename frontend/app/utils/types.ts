@@ -41,6 +41,8 @@ export interface Copy {
   cardId: string
   storageLocationId: number | null
   decklistId: number | null
+  binderPage?: number | null
+  binderSlot?: number | null
   foil: boolean
   condition: string
   language: string
@@ -62,9 +64,23 @@ export interface StorageLocation {
   id: number
   name: string
   description: string | null
+  kind: StorageKind
+  pocketsPerPage: number | null
+  pageCount: number | null
   copies: number
   decklists: { id: number; name: string }[]
+  preview: { name: string; imageUrl: string }[]
 }
+
+export type StorageKind = 'box' | 'deck_box' | 'binder'
+
+export const STORAGE_KINDS: Record<StorageKind, { label: string; icon: string }> = {
+  box: { label: 'Boîte', icon: '📦' },
+  deck_box: { label: 'Deck box', icon: '🎴' },
+  binder: { label: 'Classeur', icon: '📖' },
+}
+
+export const POCKET_LAYOUTS = [4, 9, 12, 16, 18] as const
 
 export interface DecklistSummary {
   id: number

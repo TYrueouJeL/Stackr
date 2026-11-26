@@ -4,7 +4,9 @@ import { DateTime } from 'luxon'
 import CardCopy from '#models/card_copy'
 import { assertOwnedTargets } from '#services/ownership'
 import { leaveDeckBox, storeInDeckBox } from '#services/deck_storage'
+import { Exception } from '@adonisjs/core/exceptions'
 import {
+  binderSlotValidator,
   bulkUpdateCopiesValidator,
   createCopiesValidator,
   updateCopyValidator,
@@ -141,15 +143,74 @@ export default class CopiesController {
           .update({ decklist_id: changes.decklistId, updated_at: now() })
       }
       if (explicitStorage) {
+        // Changer de rangement fait sortir de la pochette, sauf si on reste dans le même classeur
+        await trx
+          .from('card_copies')
+          .whereIn('id', ids)
+          .where((q) =>
+            changes.storageLocationId === null
+              ? q.whereNotNull('storage_location_id')
+              : q
+                  .whereNull('storage_location_id')
+                  .orWhereNot('storage_location_id', changes.storageLocationId as number)
+          )
+          .update({ binder_page: null, binder_slot: null })
         await trx.from('card_copies').whereIn('id', ids).update({
           storage_location_id: changes.storageLocationId,
           previous_storage_location_id: null,
+          previous_binder_page: null,
+          previous_binder_slot: null,
           updated_at: now(),
         })
       } else if (changes.decklistId) {
         await storeInDeckBox(ids, trx)
       }
     })
+  }
+
+  /**
+   * Place un exemplaire de classeur dans une pochette (page, emplacement), ou l'en retire
+   * avec page/slot à null. Si la pochette est occupée, les deux exemplaires échangent leur place.
+   */
+  async placeInSlot({ auth, params, request }: HttpContext) {
+    const userId = auth.getUserOrFail().id
+    const copy = await CardCopy.query()
+      .where({ id: params.id, user_id: userId })
+      .preload('storageLocation')
+      .firstOrFail()
+    const { page, slot } = await request.validateUsing(binderSlotValidator)
+    const binder = copy.storageLocation
+    if (!binder || binder.kind !== 'binder') {
+      throw new Exception("Cet exemplaire n'est pas dans un classeur", { status: 422 })
+    }
+    if ((page === null) !== (slot === null)) {
+      throw new Exception('Indique la page et la pochette', { status: 422 })
+    }
+    if (page !== null && slot !== null) {
+      if (slot > (binder.pocketsPerPage ?? 9) || page > (binder.pageCount ?? 1)) {
+        throw new Exception("Cette pochette n'existe pas dans le classeur", { status: 422 })
+      }
+    }
+
+    await db.transaction(async (trx) => {
+      if (page !== null && slot !== null) {
+        await trx
+          .from('card_copies')
+          .where({ storage_location_id: binder.id, binder_page: page, binder_slot: slot })
+          .whereNot('id', copy.id)
+          .update({ binder_page: copy.binderPage, binder_slot: copy.binderSlot })
+      }
+      await trx
+        .from('card_copies')
+        .where('id', copy.id)
+        .update({
+          binder_page: page,
+          binder_slot: slot,
+          updated_at: DateTime.utc().toSQL({ includeOffset: false }),
+        })
+    })
+    await copy.refresh()
+    return copy.toApi()
   }
 
   async destroy({ auth, params, response }: HttpContext) {

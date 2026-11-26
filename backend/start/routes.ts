@@ -50,6 +50,7 @@ router
         router.post('copies', [controllers.Copies, 'store']).as('copies.store')
         router.patch('copies', [controllers.Copies, 'bulkUpdate']).as('copies.bulk')
         router.patch('copies/:id', [controllers.Copies, 'update']).as('copies.update')
+        router.put('copies/:id/slot', [controllers.Copies, 'placeInSlot']).as('copies.slot')
         router.delete('copies/:id', [controllers.Copies, 'destroy']).as('copies.destroy')
 
         // Rangements

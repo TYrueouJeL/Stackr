@@ -33,8 +33,12 @@ export class AuthAccessTokenSchema extends BaseModel {
 }
 
 export class CardCopySchema extends BaseModel {
-  static $columns = ['cardId', 'condition', 'createdAt', 'decklistId', 'foil', 'id', 'language', 'notes', 'previousStorageLocationId', 'storageLocationId', 'updatedAt', 'userId'] as const
+  static $columns = ['binderPage', 'binderSlot', 'cardId', 'condition', 'createdAt', 'decklistId', 'foil', 'id', 'language', 'notes', 'previousBinderPage', 'previousBinderSlot', 'previousStorageLocationId', 'storageLocationId', 'updatedAt', 'userId'] as const
   $columns = CardCopySchema.$columns
+  @column()
+  declare binderPage: number | null
+  @column()
+  declare binderSlot: number | null
   @column()
   declare cardId: string
   @column()
@@ -51,6 +55,10 @@ export class CardCopySchema extends BaseModel {
   declare language: string
   @column()
   declare notes: string | null
+  @column()
+  declare previousBinderPage: number | null
+  @column()
+  declare previousBinderSlot: number | null
   @column()
   declare previousStorageLocationId: number | null
   @column()
@@ -162,7 +170,7 @@ export class DecklistSchema extends BaseModel {
 }
 
 export class StorageLocationSchema extends BaseModel {
-  static $columns = ['createdAt', 'description', 'id', 'name', 'updatedAt', 'userId'] as const
+  static $columns = ['createdAt', 'description', 'id', 'kind', 'name', 'pageCount', 'pocketsPerPage', 'updatedAt', 'userId'] as const
   $columns = StorageLocationSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -171,7 +179,13 @@ export class StorageLocationSchema extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
   @column()
+  declare kind: string
+  @column()
   declare name: string
+  @column()
+  declare pageCount: number | null
+  @column()
+  declare pocketsPerPage: number | null
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
   @column()

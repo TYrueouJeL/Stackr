@@ -23,6 +23,8 @@ export default class CardCopy extends CardCopySchema {
       cardId: this.cardId,
       storageLocationId: this.storageLocationId,
       decklistId: this.decklistId,
+      binderPage: this.binderPage,
+      binderSlot: this.binderSlot,
       foil: Boolean(this.foil),
       condition: this.condition,
       language: this.language,

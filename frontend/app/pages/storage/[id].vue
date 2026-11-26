@@ -1,5 +1,16 @@
 <script setup lang="ts">
-import type { Copy } from '~/utils/types'
+import { POCKET_LAYOUTS, STORAGE_KINDS, type Copy, type StorageKind } from '~/utils/types'
+
+type StorageDetail = {
+  id: number | null
+  name: string
+  description: string | null
+  kind: StorageKind | null
+  pocketsPerPage: number | null
+  pageCount: number | null
+  decklists: { id: number; name: string }[]
+  copies: Copy[]
+}
 
 const route = useRoute()
 const isNone = computed(() => route.params.id === 'none')
@@ -9,12 +20,12 @@ onMounted(() => refreshRefs())
 
 const { data, refresh } = await useAsyncData(
   () => `storage-${route.params.id}`,
-  async () => {
+  async (): Promise<StorageDetail> => {
     if (isNone.value) {
       const copies = await api<Copy[]>('/copies', { query: { storageLocationId: 'none' } })
-      return { id: null as number | null, name: 'Sans rangement', description: null as string | null, decklists: [] as { id: number; name: string }[], copies }
+      return { id: null, name: 'Sans rangement', description: null, kind: null, pocketsPerPage: null, pageCount: null, decklists: [], copies }
     }
-    return api<{ id: number; name: string; description: string | null; decklists: { id: number; name: string }[]; copies: Copy[] }>(`/storage-locations/${route.params.id}`)
+    return api<StorageDetail>(`/storage-locations/${route.params.id}`)
   }
 )
 
@@ -22,7 +33,8 @@ const q = ref('')
 const selected = ref(new Set<number>())
 const target = ref<number | null>(null)
 const editing = ref(false)
-const form = reactive({ name: '', description: '' })
+const form = reactive({ name: '', description: '', kind: 'box' as StorageKind, pocketsPerPage: 9, pageCount: 10 })
+const isBinder = computed(() => data.value?.kind === 'binder' && !!data.value.pocketsPerPage && !!data.value.pageCount)
 
 const copies = computed(() =>
   (data.value?.copies ?? []).filter((c) => !q.value || c.card?.name.toLowerCase().includes(q.value.toLowerCase()))
@@ -48,10 +60,18 @@ async function move() {
 function startEdit() {
   form.name = data.value?.name ?? ''
   form.description = data.value?.description ?? ''
+  form.kind = data.value?.kind ?? 'box'
+  form.pocketsPerPage = data.value?.pocketsPerPage ?? 9
+  form.pageCount = data.value?.pageCount ?? 10
   editing.value = true
 }
 async function save() {
-  await api(`/storage-locations/${route.params.id}`, { method: 'PUT', body: form })
+  try {
+    await api(`/storage-locations/${route.params.id}`, { method: 'PUT', body: form })
+  } catch (e) {
+    show(apiError(e), 'error')
+    return
+  }
   editing.value = false
   await refresh()
 }
@@ -67,7 +87,7 @@ async function remove() {
     <NuxtLink to="/storage" class="back">← Mes rangements</NuxtLink>
     <div class="page-head">
       <div class="stack" style="flex: 1">
-        <span class="eyebrow">Rangement</span>
+        <span class="eyebrow">{{ data.kind ? `${STORAGE_KINDS[data.kind].icon} ${STORAGE_KINDS[data.kind].label}` : 'Rangement' }}<template v-if="isBinder"> · {{ data.pageCount }} pages de {{ data.pocketsPerPage }} pochettes</template></span>
         <template v-if="!editing">
           <h1>{{ data.name }}</h1>
           <span v-if="data.description" class="muted">{{ data.description }}</span>
@@ -79,6 +99,15 @@ async function remove() {
         <form v-else class="row" @submit.prevent="save">
           <input v-model="form.name" placeholder="Nom" />
           <input v-model="form.description" placeholder="Description" />
+          <select v-model="form.kind">
+            <option v-for="(k, key) in STORAGE_KINDS" :key="key" :value="key">{{ k.icon }} {{ k.label }}</option>
+          </select>
+          <template v-if="form.kind === 'binder'">
+            <label class="inline small">Pochettes / page
+              <select v-model.number="form.pocketsPerPage"><option v-for="n in POCKET_LAYOUTS" :key="n" :value="n">{{ n }}</option></select>
+            </label>
+            <label class="inline small">Pages <input v-model.number="form.pageCount" type="number" min="1" max="1000" style="width: 5rem" /></label>
+          </template>
           <button class="primary">Enregistrer</button>
           <button type="button" class="ghost" @click="editing = false">Annuler</button>
         </form>
@@ -88,6 +117,15 @@ async function remove() {
         <button class="ghost danger" @click="remove">Supprimer</button>
       </div>
     </div>
+
+    <BinderView
+      v-if="isBinder"
+      :binder-id="data.id!"
+      :pockets-per-page="data.pocketsPerPage!"
+      :page-count="data.pageCount!"
+      :copies="data.copies"
+      @changed="refresh()"
+    />
 
     <div class="toolbar">
       <SearchInput v-model="q" placeholder="Filtrer par nom" />

@@ -19,6 +19,7 @@ export type ScannedRoutes = {
     'copies.store': { paramsTuple?: []; params?: {} }
     'copies.bulk': { paramsTuple?: []; params?: {} }
     'copies.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'copies.slot': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'copies.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'storage_locations.index': { paramsTuple?: []; params?: {} }
     'storage_locations.store': { paramsTuple?: []; params?: {} }
@@ -84,15 +85,16 @@ export type ScannedRoutes = {
     'storage_locations.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'decklists.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
   }
+  PUT: {
+    'copies.slot': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'storage_locations.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'decklists.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'decklists.entry': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+  }
   DELETE: {
     'copies.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'storage_locations.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'decklists.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-  }
-  PUT: {
-    'storage_locations.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'decklists.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'decklists.entry': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
   }
 }
 declare module '@adonisjs/core/types/http' {

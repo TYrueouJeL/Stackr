@@ -603,3 +603,103 @@ test.group('Rangement des decklists', (group) => {
     res.assertStatus(404)
   })
 })
+
+test.group('Classeurs', (group) => {
+  group.each.setup(async () => {
+    const cleanup = await testUtils.db().truncate()
+    user = await User.create({ email: 'ty@example.com', password: 'motdepasse123' })
+    return cleanup
+  })
+
+  test('les exemplaires ont une pochette, conservée pendant un passage en deck', async ({
+    assert,
+    client,
+  }) => {
+    await loadFixture()
+    const created = await client
+      .post('/api/v1/storage-locations')
+      .loginAs(user)
+      .json({ name: 'Classeur', kind: 'binder', pageCount: 5 })
+    created.assertStatus(201)
+    const binder = created.body() as any
+    assert.equal(binder.pocketsPerPage, 9)
+    assert.equal(binder.pageCount, 5)
+    const boxRes = await client
+      .post('/api/v1/storage-locations')
+      .loginAs(user)
+      .json({ name: 'Deck box', kind: 'deck_box' })
+    const box = boxRes.body() as any
+
+    const addRes = await client
+      .post('/api/v1/copies')
+      .loginAs(user)
+      .json({ cardId: 'TST-001', quantity: 2, storageLocationId: binder.id })
+    const [a, b] = addRes.body() as any[]
+
+    const placed = await client
+      .put(`/api/v1/copies/${a.id}/slot`)
+      .loginAs(user)
+      .json({ page: 3, slot: 2 })
+    placed.assertStatus(200)
+    assert.equal((placed.body() as any).binderPage, 3)
+    assert.equal((placed.body() as any).binderSlot, 2)
+
+    const outside = await client
+      .put(`/api/v1/copies/${a.id}/slot`)
+      .loginAs(user)
+      .json({ page: 6, slot: 1 })
+    outside.assertStatus(422)
+
+    // Placer b dans la pochette de a : les deux échangent (a n'avait que celle-là, b aucune)
+    await client.put(`/api/v1/copies/${b.id}/slot`).loginAs(user).json({ page: 3, slot: 2 })
+    const slots = async () => {
+      const res = await client.get('/api/v1/copies').loginAs(user)
+      return (res.body() as any[]).map((c) => [
+        c.id,
+        c.storageLocationId,
+        c.binderPage,
+        c.binderSlot,
+      ])
+    }
+    assert.deepEqual(await slots(), [
+      [a.id, binder.id, null, null],
+      [b.id, binder.id, 3, 2],
+    ])
+
+    // b part dans un deck rangé en deck box, puis revient dans sa pochette
+    const deckRes = await client
+      .post('/api/v1/decklists')
+      .loginAs(user)
+      .json({ name: 'Deck', storageLocationId: box.id })
+    const deckId = (deckRes.body() as any).id
+    await client
+      .patch('/api/v1/copies')
+      .loginAs(user)
+      .json({ ids: [b.id], decklistId: deckId })
+    const s1 = await slots()
+    assert.deepEqual(s1[1], [b.id, box.id, null, null])
+    await client
+      .patch('/api/v1/copies')
+      .loginAs(user)
+      .json({ ids: [b.id], decklistId: null })
+    const s2 = await slots()
+    assert.deepEqual(s2[1], [b.id, binder.id, 3, 2])
+
+    // Réduire le classeur vide les pochettes qui n'existent plus
+    await client
+      .put(`/api/v1/storage-locations/${binder.id}`)
+      .loginAs(user)
+      .json({ name: 'Classeur', pageCount: 2 })
+    const s3 = await slots()
+    assert.deepEqual(s3[1], [b.id, binder.id, null, null])
+
+    // La liste des rangements donne le type et un aperçu des cartes
+    const listRes = await client.get('/api/v1/storage-locations').loginAs(user)
+    const list = listRes.body() as any
+    const listed = list.locations.find((l: any) => l.id === binder.id)
+    assert.equal(listed.kind, 'binder')
+    assert.equal(listed.pageCount, 2)
+    assert.equal(listed.copies, 2)
+    assert.isArray(listed.preview)
+  })
+})

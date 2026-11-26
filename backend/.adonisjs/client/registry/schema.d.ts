@@ -203,6 +203,19 @@ export interface Registry {
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/copies_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'copies.slot': {
+    methods: ["PUT"]
+    pattern: '/api/v1/copies/:id/slot'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#validators/stock').binderSlotValidator)>>
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#validators/stock').binderSlotValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/copies_controller').default['placeInSlot']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/copies_controller').default['placeInSlot']>>> | { status: 422; response: { errors: SimpleError[] } }
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/copies_controller').default['placeInSlot']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'copies.destroy': {
     methods: ["DELETE"]
     pattern: '/api/v1/copies/:id'

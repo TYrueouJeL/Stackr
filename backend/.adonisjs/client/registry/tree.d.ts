@@ -36,6 +36,7 @@ export interface ApiDefinition {
     store: typeof routes['copies.store']
     bulk: typeof routes['copies.bulk']
     update: typeof routes['copies.update']
+    slot: typeof routes['copies.slot']
     destroy: typeof routes['copies.destroy']
   }
   storageLocations: {

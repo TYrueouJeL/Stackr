@@ -28,9 +28,19 @@ export const bulkUpdateCopiesValidator = vine.create({
   decklistId: vine.number().withoutDecimals().nullable().optional(),
 })
 
+export const STORAGE_KINDS = ['box', 'deck_box', 'binder'] as const
+
 export const storageLocationValidator = vine.create({
   name: vine.string().trim().minLength(1).maxLength(255),
   description: vine.string().maxLength(2000).nullable().optional(),
+  kind: vine.enum(STORAGE_KINDS).optional(),
+  pocketsPerPage: vine.number().withoutDecimals().min(1).max(24).nullable().optional(),
+  pageCount: vine.number().withoutDecimals().min(1).max(1000).nullable().optional(),
+})
+
+export const binderSlotValidator = vine.create({
+  page: vine.number().withoutDecimals().min(1).nullable(),
+  slot: vine.number().withoutDecimals().min(1).nullable(),
 })
 
 export const decklistValidator = vine.create({

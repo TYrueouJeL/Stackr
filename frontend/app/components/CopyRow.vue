@@ -42,6 +42,7 @@ async function remove() {
         <option value="">Sans rangement</option>
         <option v-for="l in locations" :key="l.id" :value="l.id">{{ l.name }}</option>
       </select>
+      <span v-if="copy.binderPage" class="tag tiny" style="margin-left: 0.35rem" title="Emplacement dans le classeur">p.{{ copy.binderPage }} · {{ copy.binderSlot }}</span>
     </td>
     <td>
       <select :value="copy.decklistId" @change="patch({ decklistId: ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null })">
