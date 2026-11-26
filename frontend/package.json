@@ -1,0 +1,25 @@
+{
+  "name": "stackr-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "nuxt": "^4.7.0",
+    "vue": "^3.5.0"
+  },
+  "allowScripts": {
+    "esbuild": true
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.11",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.14"
+  }
+}
