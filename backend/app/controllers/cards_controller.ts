@@ -3,6 +3,7 @@ import db from '@adonisjs/lucid/services/db'
 import Card from '#models/card'
 import CardCopy from '#models/card_copy'
 import DecklistEntry from '#models/decklist_entry'
+import { cardSearchConditions, parseCardQuery } from '#services/card_search'
 
 export default class CardsController {
   /**
@@ -17,7 +18,8 @@ export default class CardsController {
     const query = Card.query().withCount('copies', (sub) =>
       sub.where('user_id', userId).as('owned')
     )
-    if (q) query.whereILike('name', `%${q}%`)
+    const parsed = typeof q === 'string' ? parseCardQuery(q) : null
+    if (parsed) query.where((sub) => cardSearchConditions(sub as any, parsed))
     if (set) query.where('set_id', set)
     if (rarity) query.where('rarity', rarity)
     if (type) query.where('type', type)

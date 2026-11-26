@@ -27,7 +27,7 @@ function pick(card: Card) {
 
 <template>
   <div class="stack" style="position: relative">
-    <SearchInput v-model="q" placeholder="Ajouter une carte au deck…" />
+    <SearchInput v-model="q" placeholder="Ajouter une carte au deck : nom ou numéro (OGN 209)…" />
     <div v-if="results.length" class="dropdown">
       <button v-for="c in results" :key="c.id" type="button" @click="pick(c)">
         <img v-if="c.thumbnailUrl" :src="c.thumbnailUrl" class="thumb" alt="" />

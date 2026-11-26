@@ -38,7 +38,7 @@ function goTo(page: number) {
     </div>
 
     <div class="toolbar">
-      <SearchInput v-model="filters.q" lazy placeholder="Nom de la carte (Entrée pour chercher)" />
+      <SearchInput v-model="filters.q" lazy placeholder="Nom ou numéro, ex. Cull the Weak, OGN 209 (Entrée pour chercher)" />
       <select v-model="filters.set"><option value="">Toutes extensions</option><option v-for="s in sets" :key="s.id" :value="s.id">{{ s.name }}</option></select>
       <select v-model="filters.rarity"><option value="">Raretés</option><option v-for="r in options?.rarities" :key="r">{{ r }}</option></select>
       <select v-model="filters.type"><option value="">Types</option><option v-for="t in options?.types" :key="t">{{ t }}</option></select>

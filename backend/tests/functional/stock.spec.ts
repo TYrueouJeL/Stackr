@@ -703,3 +703,77 @@ test.group('Classeurs', (group) => {
     assert.isArray(listed.preview)
   })
 })
+
+test.group('Recherche de cartes', (group) => {
+  group.each.setup(async () => {
+    const cleanup = await testUtils.db().truncate()
+    user = await User.create({ email: 'ty@example.com', password: 'motdepasse123' })
+    await importContent({
+      game: 'riftbound',
+      version: 'search',
+      lastUpdated: '2026-01-01T00:00:00Z',
+      sets: [
+        {
+          id: 'OGN',
+          name: 'Origins',
+          cards: [
+            {
+              id: 'OGN-209-298',
+              collectorNumber: 209,
+              set: 'OGN',
+              name: 'Cull the Weak',
+              type: 'Spell',
+            },
+            {
+              id: 'OGN-014-298',
+              collectorNumber: 14,
+              set: 'OGN',
+              name: 'Blood Rush',
+              type: 'Spell',
+            },
+          ],
+        },
+        {
+          id: 'SFD',
+          name: 'Spiritforged',
+          cards: [
+            { id: 'SFD-051-221', collectorNumber: 51, set: 'SFD', name: 'Salvage', type: 'Spell' },
+          ],
+        },
+      ],
+    } as any)
+    return cleanup
+  })
+
+  test('trouve une carte par nom sans casse ou par code et numéro', async ({ assert, client }) => {
+    const search = async (q: string) => {
+      const res = await client.get('/api/v1/cards').qs({ q }).loginAs(user)
+      res.assertStatus(200)
+      return (res.body() as any).data.map((c: any) => c.name)
+    }
+    for (const q of [
+      'cull the weak',
+      'CULL THE WEAK',
+      'Cull',
+      'OGN 209',
+      'ogn-209',
+      'ogn209',
+      'OGN',
+      '209',
+      '20',
+      '09',
+      '2',
+      '9',
+      '0',
+      'OGN-209-298',
+    ]) {
+      assert.include(await search(q), 'Cull the Weak', `« ${q} » doit trouver Cull the Weak`)
+    }
+    assert.deepEqual(await search('OGN 209'), ['Cull the Weak'])
+    assert.deepEqual(await search('209'), ['Cull the Weak'])
+    assert.notInclude(await search('SFD'), 'Cull the Weak')
+    assert.notInclude(await search('OGN 51'), 'Salvage')
+    assert.deepEqual(await search('sfd 51'), ['Salvage'])
+    assert.deepEqual(await search('50%'), [])
+  })
+})

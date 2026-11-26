@@ -37,7 +37,7 @@ const form = reactive({ name: '', description: '', kind: 'box' as StorageKind, p
 const isBinder = computed(() => data.value?.kind === 'binder' && !!data.value.pocketsPerPage && !!data.value.pageCount)
 
 const copies = computed(() =>
-  (data.value?.copies ?? []).filter((c) => !q.value || c.card?.name.toLowerCase().includes(q.value.toLowerCase()))
+  (data.value?.copies ?? []).filter((c) => !q.value || (!!c.card && matchesCard(c.card, q.value)))
 )
 
 function toggle(id: number) {
@@ -128,7 +128,7 @@ async function remove() {
     />
 
     <div class="toolbar">
-      <SearchInput v-model="q" placeholder="Filtrer par nom" />
+      <SearchInput v-model="q" placeholder="Filtrer par nom ou numéro (OGN 209)" />
       <span class="tiny muted">{{ copies.length }} exemplaire{{ copies.length > 1 ? 's' : '' }}</span>
     </div>
 

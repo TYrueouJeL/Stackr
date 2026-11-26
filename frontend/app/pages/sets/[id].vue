@@ -14,7 +14,7 @@ const cards = computed(() =>
     if (filter.value === 'owned' && c.owned === 0) return false
     if (filter.value === 'missing' && c.owned > 0) return false
     if (rarity.value && c.rarity !== rarity.value) return false
-    if (q.value && !c.name.toLowerCase().includes(q.value.toLowerCase())) return false
+    if (q.value && !matchesCard(c, q.value)) return false
     return true
   })
 )
@@ -50,7 +50,7 @@ async function quickAdd(cardId: string, name: string) {
     </section>
 
     <div class="toolbar">
-      <SearchInput v-model="q" placeholder="Filtrer par nom" />
+      <SearchInput v-model="q" placeholder="Filtrer par nom ou numéro (209)" />
       <div class="segmented">
         <button :class="{ on: filter === 'all' }" @click="filter = 'all'">Toutes</button>
         <button :class="{ on: filter === 'owned' }" @click="filter = 'owned'">Possédées</button>
