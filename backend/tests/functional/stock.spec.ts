@@ -353,7 +353,8 @@ test.group('Decklists par sections', (group) => {
       sideboard: 10,
     })
 
-    const detail = (await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)).body() as any
+    const detailRes = await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)
+    const detail = detailRes.body() as any
     const bySection = (s: string) => detail.entries.filter((e: any) => e.section === s)
     assert.equal(bySection('legend')[0].card.name, "Rek'sai - Void Burrower")
     assert.equal(bySection('champion')[0].card.name, "Rek'Sai - Breacher")
@@ -379,7 +380,8 @@ test.group('Decklists par sections', (group) => {
         .join('\n\n')
     assert.equal(normalize(exported.text()), normalize(USER_DECK))
 
-    const list = (await client.get('/api/v1/decklists').loginAs(user)).body() as any
+    const listRes = await client.get('/api/v1/decklists').loginAs(user)
+    const list = listRes.body() as any
     assert.equal(list[0].legend.name, "Rek'sai - Void Burrower")
     assert.include(list[0].domains, 'Fury')
   })
@@ -400,7 +402,8 @@ test.group('Decklists par sections', (group) => {
     const assigned = await client.post(`/api/v1/decklists/${deckId}/auto-assign`).loginAs(user)
     assert.equal((assigned.body() as any).assigned, 3)
 
-    const detail = (await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)).body() as any
+    const detailRes = await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)
+    const detail = detailRes.body() as any
     assert.equal(detail.totalCards, 3)
     assert.equal(detail.missingCards, 0)
     assert.deepEqual(
