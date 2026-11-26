@@ -19,50 +19,57 @@ const cards = computed(() =>
   })
 )
 
-async function quickAdd(cardId: string) {
-  await api('/copies', { method: 'POST', body: { cardId } })
-  show('1 exemplaire ajouté')
-  await refresh()
+async function quickAdd(cardId: string, name: string) {
+  try {
+    await api('/copies', { method: 'POST', body: { cardId } })
+    show(`${name} ajoutée à ta collection`)
+    await refresh()
+  } catch (e) {
+    show(apiError(e), 'error')
+  }
 }
 </script>
 
 <template>
   <div v-if="set">
-    <NuxtLink to="/" class="small">← Toutes les extensions</NuxtLink>
-    <h1>{{ set.name }} <span class="tag">{{ set.id }}</span></h1>
-
-    <div class="panel stack" style="margin-bottom: 1rem">
-      <div class="row between">
-        <strong>{{ set.completion }} % du masterset</strong>
-        <span class="muted">{{ set.ownedCards }} / {{ set.totalCards }} cartes · {{ set.totalCopies }} exemplaires</span>
+    <NuxtLink to="/" class="back">← Toutes les extensions</NuxtLink>
+    <section class="hero fade-up" style="padding: 1.6rem 1.8rem">
+      <div class="hero-inner">
+        <div class="stack" style="gap: 0.5rem">
+          <span class="eyebrow">Extension · {{ set.id }}</span>
+          <h1>{{ set.name }}</h1>
+          <span class="muted">{{ set.ownedCards }} / {{ set.totalCards }} cartes · {{ set.totalCopies }} exemplaires</span>
+          <div class="row" style="margin-top: 0.4rem">
+            <span v-for="(r, name) in set.byRarity" :key="name" class="tag rarity" :class="rarityClass(String(name))">
+              {{ name }} <strong>{{ r.owned }}/{{ r.total }}</strong>
+            </span>
+          </div>
+        </div>
+        <ProgressRing :value="set.completion" :size="130" :stroke="10" />
       </div>
-      <ProgressBar :value="set.completion" />
-      <div class="row small">
-        <span v-for="(r, name) in set.byRarity" :key="name" class="tag" :class="{ ok: r.owned === r.total }">
-          {{ name }} : {{ r.owned }}/{{ r.total }}
-        </span>
-      </div>
-    </div>
+    </section>
 
-    <div class="row" style="margin-bottom: 1rem">
-      <input v-model="q" placeholder="Filtrer par nom" />
-      <select v-model="filter">
-        <option value="all">Toutes</option>
-        <option value="owned">Possédées</option>
-        <option value="missing">Manquantes</option>
-      </select>
+    <div class="toolbar">
+      <SearchInput v-model="q" placeholder="Filtrer par nom" />
+      <div class="segmented">
+        <button :class="{ on: filter === 'all' }" @click="filter = 'all'">Toutes</button>
+        <button :class="{ on: filter === 'owned' }" @click="filter = 'owned'">Possédées</button>
+        <button :class="{ on: filter === 'missing' }" @click="filter = 'missing'">Manquantes</button>
+      </div>
       <select v-model="rarity">
         <option value="">Toutes raretés</option>
         <option v-for="(_, name) in set.byRarity" :key="name" :value="name">{{ name }}</option>
       </select>
-      <span class="muted small">{{ cards.length }} cartes</span>
+      <span class="tiny muted">{{ cards.length }} cartes</span>
     </div>
 
+    <div v-if="!cards.length" class="empty"><div class="icon">🔍</div>Aucune carte ne correspond à ces filtres.</div>
     <div class="grid cards">
-      <div v-for="card in cards" :key="card.id" class="stack" style="gap: .3rem">
-        <CardTile :card="card" />
-        <button class="small" @click="quickAdd(card.id)">+1</button>
-      </div>
+      <CardTile v-for="card in cards" :key="card.id" :card="card">
+        <template #quick>
+          <button class="primary small" :title="`Ajouter un exemplaire de ${card.name}`" @click="quickAdd(card.id, card.name)">+ 1</button>
+        </template>
+      </CardTile>
     </div>
   </div>
 </template>

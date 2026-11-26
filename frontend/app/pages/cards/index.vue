@@ -19,29 +19,45 @@ watch(() => [filters.q, filters.set, filters.rarity, filters.type, filters.facti
 
 const { data: sets } = await useApiFetch<SetSummary[]>('/sets', { default: () => [] })
 const { data: options } = await useApiFetch<{ rarities: string[]; types: string[]; factions: string[] }>('/cards/filters')
-const { data: result } = await useApiFetch<Paginated<Card>>('/cards', { query: computed(() => ({ ...filters, perPage: 60 })) })
+const { data: result, status } = await useApiFetch<Paginated<Card>>('/cards', { query: computed(() => ({ ...filters, perPage: 60 })) })
+
+function goTo(page: number) {
+  filters.page = page
+  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 </script>
 
 <template>
   <div>
-    <h1>Cartes</h1>
-    <div class="row" style="margin-bottom: 1rem">
-      <input v-model.lazy="filters.q" placeholder="Nom de la carte" />
+    <div class="page-head">
+      <div class="stack">
+        <span class="eyebrow">Catalogue</span>
+        <h1>Toutes les cartes</h1>
+      </div>
+      <span class="muted small">{{ result?.meta.total ?? 0 }} cartes</span>
+    </div>
+
+    <div class="toolbar">
+      <SearchInput v-model="filters.q" lazy placeholder="Nom de la carte (Entrée pour chercher)" />
       <select v-model="filters.set"><option value="">Toutes extensions</option><option v-for="s in sets" :key="s.id" :value="s.id">{{ s.name }}</option></select>
       <select v-model="filters.rarity"><option value="">Raretés</option><option v-for="r in options?.rarities" :key="r">{{ r }}</option></select>
       <select v-model="filters.type"><option value="">Types</option><option v-for="t in options?.types" :key="t">{{ t }}</option></select>
-      <select v-model="filters.faction"><option value="">Factions</option><option v-for="f in options?.factions" :key="f">{{ f }}</option></select>
-      <select v-model="filters.owned"><option value="">Possédées ou non</option><option value="yes">Possédées</option><option value="no">Manquantes</option></select>
+      <select v-model="filters.faction"><option value="">Domaines</option><option v-for="f in options?.factions" :key="f">{{ f }}</option></select>
+      <div class="segmented">
+        <button :class="{ on: filters.owned === '' }" @click="filters.owned = ''">Toutes</button>
+        <button :class="{ on: filters.owned === 'yes' }" @click="filters.owned = 'yes'">Possédées</button>
+        <button :class="{ on: filters.owned === 'no' }" @click="filters.owned = 'no'">Manquantes</button>
+      </div>
     </div>
 
-    <p class="muted small">{{ result?.meta.total ?? 0 }} cartes</p>
-    <div class="grid cards">
+    <div v-if="result && !result.data.length" class="empty"><div class="icon">🔍</div>Aucune carte ne correspond à ta recherche.</div>
+    <div class="grid cards" :style="{ opacity: status === 'pending' ? 0.55 : 1, transition: 'opacity .2s' }">
       <CardTile v-for="card in result?.data" :key="card.id" :card="card" />
     </div>
-    <div v-if="result && result.meta.lastPage > 1" class="row" style="margin-top: 1rem; justify-content: center">
-      <button :disabled="filters.page <= 1" @click="filters.page--">Précédent</button>
-      <span>Page {{ result.meta.currentPage }} / {{ result.meta.lastPage }}</span>
-      <button :disabled="filters.page >= result.meta.lastPage" @click="filters.page++">Suivant</button>
+    <div v-if="result && result.meta.lastPage > 1" class="row" style="margin-top: 2rem; justify-content: center">
+      <button :disabled="filters.page <= 1" @click="goTo(filters.page - 1)">← Précédent</button>
+      <span class="small muted">Page {{ result.meta.currentPage }} / {{ result.meta.lastPage }}</span>
+      <button :disabled="filters.page >= result.meta.lastPage" @click="goTo(filters.page + 1)">Suivant →</button>
     </div>
   </div>
 </template>

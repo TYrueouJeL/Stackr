@@ -27,11 +27,14 @@ function pick(card: Card) {
 
 <template>
   <div class="stack" style="position: relative">
-    <input v-model="q" placeholder="Rechercher une carte à ajouter…" />
-    <div v-if="results.length" class="panel stack" style="position: absolute; top: 100%; left: 0; right: 0; z-index: 5; padding: .4rem; gap: 0">
-      <button v-for="c in results" :key="c.id" type="button" style="text-align: left; border: none" @click="pick(c)">
-        <strong>{{ c.name }}</strong>
-        <span class="muted small"> · {{ c.setId }} #{{ c.collectorNumber }} · {{ c.type }} · {{ c.owned }} possédé(s)</span>
+    <SearchInput v-model="q" placeholder="Ajouter une carte au deck…" />
+    <div v-if="results.length" class="dropdown">
+      <button v-for="c in results" :key="c.id" type="button" @click="pick(c)">
+        <img v-if="c.thumbnailUrl" :src="c.thumbnailUrl" class="thumb" alt="" />
+        <span class="stack" style="gap: 0">
+          <strong style="font-weight: 600">{{ c.name }}</strong>
+          <span class="tiny muted">{{ c.setId }} #{{ c.collectorNumber }} · {{ c.type }} · {{ c.owned }} possédé(s)</span>
+        </span>
       </button>
     </div>
   </div>

@@ -50,7 +50,7 @@ async function submit() {
       <select v-model="form.condition"><option v-for="c in CONDITIONS" :key="c">{{ c }}</option></select>
     </label>
     <label>Langue <input v-model="form.language" style="width: 4rem" /></label>
-    <label class="row" style="flex-direction: row; align-self: end"><input v-model="form.foil" type="checkbox" /> Foil</label>
+    <label class="inline" style="align-self: end; padding-bottom: 0.55rem"><input v-model="form.foil" type="checkbox" /> Foil ✦</label>
     <button class="primary" :disabled="busy" style="align-self: end">Ajouter</button>
   </form>
 </template>

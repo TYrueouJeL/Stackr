@@ -72,6 +72,7 @@ export interface DecklistSummary {
   totalCards: number
   assignedCopies: number
   complete: boolean
+  previews: string[]
 }
 
 export interface DecklistDetail {

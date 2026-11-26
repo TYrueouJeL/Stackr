@@ -64,38 +64,48 @@ async function remove() {
 
 <template>
   <div v-if="data">
-    <NuxtLink to="/storage" class="small">← Rangements</NuxtLink>
-    <div v-if="!editing" class="row between">
-      <h1>{{ data.name }}</h1>
-      <div v-if="!isNone" class="row">
-        <button class="small" @click="startEdit">Modifier</button>
-        <button class="small danger" @click="remove">Supprimer</button>
+    <NuxtLink to="/storage" class="back">← Mes rangements</NuxtLink>
+    <div class="page-head">
+      <div class="stack" style="flex: 1">
+        <span class="eyebrow">Rangement</span>
+        <template v-if="!editing">
+          <h1>{{ data.name }}</h1>
+          <span v-if="data.description" class="muted">{{ data.description }}</span>
+        </template>
+        <form v-else class="row" @submit.prevent="save">
+          <input v-model="form.name" placeholder="Nom" />
+          <input v-model="form.description" placeholder="Description" />
+          <button class="primary">Enregistrer</button>
+          <button type="button" class="ghost" @click="editing = false">Annuler</button>
+        </form>
+      </div>
+      <div v-if="!isNone && !editing" class="row">
+        <button class="ghost" @click="startEdit">Modifier</button>
+        <button class="ghost danger" @click="remove">Supprimer</button>
       </div>
     </div>
-    <form v-else class="stack panel" style="margin-bottom: 1rem" @submit.prevent="save">
-      <label>Nom <input v-model="form.name" /></label>
-      <label>Description <input v-model="form.description" /></label>
-      <div class="row"><button class="primary">Enregistrer</button><button type="button" @click="editing = false">Annuler</button></div>
-    </form>
-    <p v-if="data.description && !editing" class="muted">{{ data.description }}</p>
 
-    <div class="row" style="margin-bottom: 1rem">
-      <input v-model="q" placeholder="Filtrer par nom" />
-      <span class="muted small">{{ copies.length }} exemplaire(s)</span>
+    <div class="toolbar">
+      <SearchInput v-model="q" placeholder="Filtrer par nom" />
+      <span class="tiny muted">{{ copies.length }} exemplaire{{ copies.length > 1 ? 's' : '' }}</span>
     </div>
 
-    <div v-if="selected.size" class="panel row" style="margin-bottom: 1rem">
-      <strong>{{ selected.size }} sélectionné(s)</strong>
-      <span>Déplacer vers</span>
-      <select v-model="target">
-        <option :value="null">Sans rangement</option>
-        <option v-for="l in locations" :key="l.id" :value="l.id">{{ l.name }}</option>
-      </select>
-      <button class="primary" @click="move">Déplacer</button>
-    </div>
+    <Transition name="page">
+      <div v-if="selected.size" class="panel glow row" style="margin-bottom: 1.2rem; position: sticky; top: 76px; z-index: 5; background: rgba(18, 22, 40, 0.95)">
+        <strong>{{ selected.size }} sélectionné{{ selected.size > 1 ? 's' : '' }}</strong>
+        <span class="muted">→ déplacer vers</span>
+        <select v-model="target">
+          <option :value="null">Sans rangement</option>
+          <option v-for="l in locations" :key="l.id" :value="l.id">{{ l.name }}</option>
+        </select>
+        <button class="primary" @click="move">Déplacer</button>
+        <span class="spacer" />
+        <button class="ghost small" @click="selected = new Set()">Désélectionner</button>
+      </div>
+    </Transition>
 
-    <div v-if="!copies.length" class="panel empty">Aucun exemplaire ici.</div>
-    <div v-else class="table-wrap panel">
+    <div v-if="!copies.length" class="empty"><div class="icon">📭</div>Aucun exemplaire ici.</div>
+    <div v-else class="panel table-wrap">
       <table>
         <thead>
           <tr>

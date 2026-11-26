@@ -23,8 +23,11 @@ async function submit() {
 </script>
 
 <template>
-  <div class="auth-box panel">
-    <h1>Créer un compte</h1>
+  <div class="auth-wrap">
+  <div class="auth-box panel glow fade-up">
+    <div class="logo"><Logo /></div>
+    <h1 style="text-align: center; font-size: 1.7rem">Créer un compte</h1>
+    <p class="muted small" style="text-align: center; margin: 0.4rem 0 1.4rem">Commence à suivre ta collection Riftbound</p>
     <form class="stack" @submit.prevent="submit">
       <label>Nom (optionnel) <input v-model="form.fullName" autocomplete="name" /></label>
       <label>E-mail <input v-model="form.email" type="email" autocomplete="email" required /></label>
@@ -35,8 +38,9 @@ async function submit() {
         <input v-model="form.passwordConfirmation" type="password" autocomplete="new-password" required />
       </label>
       <p v-if="error" class="error">{{ error }}</p>
-      <button class="primary" :disabled="busy">Créer mon compte</button>
+      <button class="primary" :disabled="busy" style="margin-top: 0.4rem; padding: 0.7rem">Créer mon compte</button>
     </form>
-    <p class="muted small">Déjà inscrit ? <NuxtLink to="/login">Se connecter</NuxtLink></p>
+    <p class="muted small" style="text-align: center; margin-top: 1.2rem">Déjà inscrit ? <NuxtLink to="/login">Se connecter</NuxtLink></p>
+  </div>
   </div>
 </template>

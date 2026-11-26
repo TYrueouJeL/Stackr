@@ -18,6 +18,26 @@ export default class DecklistsController {
       .withAggregate('entries', (q) => q.sum('quantity').as('total_cards'))
       .withCount('copies', (q) => q.as('assigned'))
       .orderBy('name')
+
+    // Aperçu : jusqu'à 3 illustrations par deck, la légende en premier
+    const ids = decklists.map((d) => d.id)
+    const previews = ids.length
+      ? await db
+          .from('decklist_entries as e')
+          .join('cards as c', 'c.id', 'e.card_id')
+          .whereIn('e.decklist_id', ids)
+          .whereNotNull('c.thumbnail_url')
+          .select('e.decklist_id', 'c.thumbnail_url', 'c.type', 'e.quantity')
+          .orderByRaw("case when c.type = 'Legend' then 0 else 1 end")
+          .orderBy('e.quantity', 'desc')
+      : []
+    const covers = new Map<number, string[]>()
+    for (const row of previews) {
+      const list = covers.get(row.decklist_id) ?? []
+      if (list.length < 3) list.push(row.thumbnail_url)
+      covers.set(row.decklist_id, list)
+    }
+
     return decklists.map((d) => {
       const total = Number(d.$extras.total_cards ?? 0)
       const assigned = Number(d.$extras.assigned ?? 0)
@@ -28,6 +48,7 @@ export default class DecklistsController {
         totalCards: total,
         assignedCopies: assigned,
         complete: total > 0 && assigned >= total,
+        previews: covers.get(d.id) ?? [],
       }
     })
   }

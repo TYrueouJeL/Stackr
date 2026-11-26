@@ -27,10 +27,15 @@ async function remove() {
 <template>
   <tr>
     <td v-if="selectable"><input type="checkbox" :checked="selected" @change="emit('toggle', copy.id)" /></td>
-    <td class="muted small">#{{ copy.id }}</td>
+    <td class="faint small">#{{ copy.id }}</td>
     <td v-if="showCard && copy.card">
-      <NuxtLink :to="`/cards/${encodeURIComponent(copy.card.id)}`">{{ copy.card.name }}</NuxtLink>
-      <span class="muted small"> · {{ copy.card.setId }} #{{ copy.card.collectorNumber }}</span>
+      <NuxtLink :to="`/cards/${encodeURIComponent(copy.card.id)}`" class="card-cell">
+        <img v-if="copy.card.thumbnailUrl" :src="copy.card.thumbnailUrl" class="thumb" alt="" loading="lazy" />
+        <span class="stack" style="gap: 0">
+          <span style="color: var(--text); font-weight: 500">{{ copy.card.name }}</span>
+          <span class="tiny faint">{{ copy.card.setId }} #{{ copy.card.collectorNumber }}</span>
+        </span>
+      </NuxtLink>
     </td>
     <td>
       <select :value="copy.storageLocationId" @change="patch({ storageLocationId: ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null })">
@@ -49,8 +54,8 @@ async function remove() {
         <option v-for="c in CONDITIONS" :key="c">{{ c }}</option>
       </select>
     </td>
-    <td><label class="row" style="flex-direction: row"><input type="checkbox" :checked="copy.foil" @change="patch({ foil: ($event.target as HTMLInputElement).checked })" /> Foil</label></td>
+    <td><label class="inline"><input type="checkbox" :checked="copy.foil" @change="patch({ foil: ($event.target as HTMLInputElement).checked })" /><span v-if="copy.foil" class="tag foil">FOIL</span></label></td>
     <td class="small">{{ copy.language }}</td>
-    <td><button class="small danger" title="Supprimer" @click="remove">Suppr.</button></td>
+    <td><button class="small ghost danger" title="Supprimer cet exemplaire" @click="remove">Supprimer</button></td>
   </tr>
 </template>
