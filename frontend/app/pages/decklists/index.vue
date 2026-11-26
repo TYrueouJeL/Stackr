@@ -74,6 +74,9 @@ async function create() {
             </span>
             <span v-if="!d.domains.length" class="tag faint">Couleurs inconnues</span>
           </div>
+          <span v-if="d.totalCards" class="tag" :class="d.legality.legal ? 'ok' : 'danger'" style="align-self: flex-start">
+            {{ d.legality.legal ? '✓ Légal' : `⚠ Non légal · ${d.legality.issues} problème${d.legality.issues > 1 ? 's' : ''}` }}
+          </span>
           <ProgressBar :value="d.totalCards ? (d.assignedCopies / d.totalCards) * 100 : 0" />
           <span class="tiny muted">{{ d.assignedCopies }} / {{ d.totalCards }} exemplaires en place</span>
         </div>

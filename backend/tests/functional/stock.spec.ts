@@ -290,7 +290,7 @@ function deckFixture() {
     set: 'DCK',
     name,
     type,
-    faction: name.startsWith('Order') ? 'Order' : 'Fury',
+    faction: type === 'Legend' ? 'Fury / Order' : name.startsWith('Order') ? 'Order' : 'Fury',
   }))
   // Variantes qui ne doivent pas être choisies à la place de la version de base
   cards.push(
@@ -384,6 +384,83 @@ test.group('Decklists par sections', (group) => {
     const list = listRes.body() as any
     assert.equal(list[0].legend.name, "Rek'sai - Void Burrower")
     assert.include(list[0].domains, 'Fury')
+    assert.deepEqual(list[0].legality, { legal: true, issues: 0 })
+
+    // La liste d'exemple est légale : 1 légende, 1 + 39 cartes, 3 champs de bataille, 12 runes
+    assert.isTrue(detail.legality.legal, detail.legality.issues.join('\n'))
+    assert.deepEqual(
+      detail.legality.sections.map((x: any) => [x.section, x.count, x.ok]),
+      [
+        ['legend', 1, true],
+        ['champion', 1, true],
+        ['main', 39, true],
+        ['battlefield', 3, true],
+        ['rune', 12, true],
+        ['sideboard', 10, true],
+      ]
+    )
+
+    // Un 4e Cleave en sideboard et une carte de moins en main deck rendent le deck illégal
+    await client
+      .put(`/api/v1/decklists/${deckId}/entries`)
+      .loginAs(user)
+      .json({ cardId: 'DCK-006', quantity: 1, section: 'sideboard' })
+    await client
+      .put(`/api/v1/decklists/${deckId}/entries`)
+      .loginAs(user)
+      .json({ cardId: 'DCK-004', quantity: 1, section: 'main' })
+    const illegalRes = await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)
+    const illegal = (illegalRes.body() as any).legality
+    assert.isFalse(illegal.legal)
+    assert.deepEqual(illegal.issues, [
+      'Main deck : 38 cartes, il en faut exactement 39.',
+      'Sideboard : 11 cartes, il en faut 10 au plus.',
+      'Cleave : 4 exemplaires (deck + sideboard), 3 au maximum.',
+    ])
+  })
+
+  test('le champion doit correspondre à la légende et les cartes à ses domaines', async ({
+    assert,
+  }) => {
+    const { checkLegality } = await import('#services/deck_legality')
+    const result = checkLegality([
+      {
+        section: 'legend',
+        quantity: 1,
+        card: { name: 'Jinx - Loose Cannon', type: 'Legend', faction: 'Fury / Chaos' },
+      },
+      {
+        section: 'champion',
+        quantity: 1,
+        card: { name: 'Vi - Peacekeeper', type: 'Unit', faction: 'Order' },
+      },
+      { section: 'rune', quantity: 12, card: { name: 'Calm Rune', type: 'Rune', faction: 'Calm' } },
+      {
+        section: 'battlefield',
+        quantity: 2,
+        card: { name: 'Same Place', type: 'Battlefield', faction: null },
+      },
+      {
+        section: 'battlefield',
+        quantity: 1,
+        card: { name: 'Other Place', type: 'Battlefield', faction: null },
+      },
+    ])
+    assert.isFalse(result.legal)
+    assert.include(result.issues, 'Main deck : 0 carte, il en faut exactement 39.')
+    assert.include(
+      result.issues,
+      'Le champion choisi (Vi - Peacekeeper) ne correspond pas à la Légende (Jinx - Loose Cannon).'
+    )
+    assert.include(result.issues, 'Les 3 champs de bataille doivent avoir des noms différents.')
+    assert.include(
+      result.issues,
+      "Calm Rune n'est pas dans les domaines de la Légende (Fury / Chaos)."
+    )
+    assert.include(
+      result.issues,
+      "Vi - Peacekeeper n'est pas dans les domaines de la Légende (Fury / Chaos)."
+    )
   })
 
   test('une même carte peut être en main deck et en sideboard', async ({ assert, client }) => {

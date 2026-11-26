@@ -77,6 +77,7 @@ export interface DecklistSummary {
   legend: { id: string; name: string; thumbnailUrl: string | null } | null
   domains: string[]
   images: string[]
+  legality: { legal: boolean; issues: number }
 }
 
 export type DeckSection = 'legend' | 'champion' | 'main' | 'battlefield' | 'rune' | 'sideboard'
@@ -107,6 +108,11 @@ export interface DecklistDetail {
     available: number
   }[]
   sections: { section: DeckSection; count: number }[]
+  legality: {
+    legal: boolean
+    sections: { section: DeckSection; count: number; min: number; max: number; ok: boolean }[]
+    issues: string[]
+  }
   extraCopies: Copy[]
 }
 

@@ -20,7 +20,7 @@ const pickSection = ref<DeckSection | ''>('')
 type Entry = DecklistDetail['entries'][number]
 const rowKey = (e: Entry) => `${e.section}:${e.card.id}`
 const groups = computed(() =>
-  (deck.value?.sections ?? []).map((s) => ({
+  (deck.value?.sections ?? []).filter((s) => s.count > 0).map((s) => ({
     ...s,
     label: SECTION_LABELS[s.section] ?? s.section,
     entries: deck.value!.entries.filter((e) => e.section === s.section),
@@ -166,6 +166,21 @@ async function assign(copyId: number, decklistId: number | null) {
       </div>
     </section>
 
+    <section v-if="deck.legality" class="panel legality fade-up" :class="deck.legality.legal ? 'is-legal' : 'is-illegal'">
+      <div class="row between" style="align-items: center">
+        <strong class="legality-title">{{ deck.legality.legal ? '✓ Deck légal' : '⚠ Deck non légal' }}</strong>
+        <span class="tiny faint">Règles officielles : 40 cartes champion compris (1 + 39), 3 exemplaires max par nom</span>
+      </div>
+      <div class="legality-chips">
+        <span v-for="s in deck.legality.sections" :key="s.section" class="tag" :class="s.ok ? 'ok' : 'danger'">
+          {{ SECTION_LABELS[s.section] }} {{ s.min === s.max ? `${s.count}/${s.max}` : `${s.count} (max ${s.max})` }}
+        </span>
+      </div>
+      <ul v-if="deck.legality.issues.length" class="legality-issues small">
+        <li v-for="issue in deck.legality.issues" :key="issue">{{ issue }}</li>
+      </ul>
+    </section>
+
     <div class="toolbar">
       <button class="primary" @click="autoAssign">✦ Affecter les exemplaires libres</button>
       <button @click="showImport = !showImport">Importer une liste</button>
@@ -287,6 +302,13 @@ async function assign(copyId: number, decklistId: number | null) {
 
 <style scoped>
 .deck-section { margin-top: 1.4rem; }
+.legality { margin-bottom: 1.2rem; display: flex; flex-direction: column; gap: 0.7rem; border-left: 3px solid var(--ok, #4fd18b); }
+.legality.is-illegal { border-left-color: var(--danger, #f06a6a); }
+.legality-title { font-family: var(--font-display); font-size: 1.05rem; }
+.is-legal .legality-title { color: var(--ok, #4fd18b); }
+.is-illegal .legality-title { color: var(--danger, #f06a6a); }
+.legality-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.legality-issues { margin: 0; padding-left: 1.1rem; color: var(--muted); display: grid; gap: 0.2rem; }
 .deck-box { gap: 0.5rem; margin-top: 0.3rem; }
 .deck-box select { max-width: 240px; }
 .deck-section-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.55rem; }

@@ -5,6 +5,7 @@ import Decklist from '#models/decklist'
 import DecklistEntry from '#models/decklist_entry'
 import CardCopy from '#models/card_copy'
 import { assertOwnedTargets } from '#services/ownership'
+import { checkLegality } from '#services/deck_legality'
 import { leaveDeckBox, moveDeckBox, storeInDeckBox } from '#services/deck_storage'
 import {
   SECTIONS,
@@ -39,6 +40,8 @@ export default class DecklistsController {
           .select(
             'e.decklist_id',
             'e.quantity',
+            'e.section',
+            'c.keywords',
             'c.id',
             'c.name',
             'c.type',
@@ -55,6 +58,7 @@ export default class DecklistsController {
         legend: { id: string; name: string; thumbnailUrl: string | null } | null
         domains: string[]
         images: string[]
+        legality: { legal: boolean; issues: number }
       }
     >()
     for (const id of ids) {
@@ -99,6 +103,12 @@ export default class DecklistsController {
           : null,
         domains,
         images,
+        legality: (() => {
+          const l = checkLegality(
+            entries.map((e) => ({ section: e.section, quantity: Number(e.quantity), card: e }))
+          )
+          return { legal: l.legal, issues: l.issues.length }
+        })(),
       })
     }
 
@@ -115,7 +125,12 @@ export default class DecklistsController {
         storageLocation: d.storageLocation
           ? { id: d.storageLocation.id, name: d.storageLocation.name }
           : null,
-        ...(previews.get(d.id) ?? { legend: null, domains: [], images: [] }),
+        ...(previews.get(d.id) ?? {
+          legend: null,
+          domains: [],
+          images: [],
+          legality: { legal: false, issues: 0 },
+        }),
       }
     })
   }
@@ -198,6 +213,9 @@ export default class DecklistsController {
       assignedCopies: assignedCount,
       missingCards: rows.reduce((s, r) => s + r.missing, 0),
       sections,
+      legality: checkLegality(
+        entries.map((e) => ({ section: e.section, quantity: e.quantity, card: e.card }))
+      ),
       entries: rows,
       extraCopies: extra.map((c) => c.toApi()),
     }
