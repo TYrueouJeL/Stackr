@@ -1,0 +1,72 @@
+{
+  "game": "riftbound",
+  "version": "test",
+  "lastUpdated": "2026-01-01T00:00:00Z",
+  "sets": [
+    {
+      "id": "TST",
+      "name": "Extension de test",
+      "cards": [
+        {
+          "id": "TST-001",
+          "collectorNumber": 1,
+          "set": "TST",
+          "name": "Carte Alpha",
+          "type": "Unit",
+          "rarity": "Common",
+          "faction": "Fury",
+          "stats": { "energy": 2, "might": 3 },
+          "keywords": ["Accelerate"],
+          "art": { "thumbnailURL": "https://example.invalid/1.png", "artist": "Test" },
+          "tags": []
+        },
+        {
+          "id": "TST-002",
+          "collectorNumber": 2,
+          "set": "TST",
+          "name": "Carte Beta",
+          "type": "Spell",
+          "rarity": "Rare",
+          "faction": "Calm",
+          "stats": { "energy": 1 },
+          "keywords": [],
+          "tags": ["test"]
+        },
+        {
+          "id": "TST-003",
+          "collectorNumber": 3,
+          "set": "TST",
+          "name": "Carte Gamma",
+          "type": "Unit",
+          "rarity": "Epic",
+          "faction": "Mind",
+          "stats": { "energy": 4, "might": 5 }
+        },
+        {
+          "id": "TST-004",
+          "collectorNumber": 4,
+          "set": "TST",
+          "name": "Carte Delta",
+          "type": "Gear",
+          "rarity": "Common",
+          "faction": "Body"
+        }
+      ]
+    },
+    {
+      "id": "TS2",
+      "name": "Deuxième extension",
+      "cards": [
+        {
+          "id": "TS2-001",
+          "collectorNumber": 1,
+          "set": "TS2",
+          "name": "Carte Epsilon",
+          "type": "Unit",
+          "rarity": "Common",
+          "faction": "Chaos"
+        }
+      ]
+    }
+  ]
+}
