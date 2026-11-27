@@ -10,6 +10,7 @@ export type ScannedRoutes = {
     'profile.access_tokens.destroy': { paramsTuple?: []; params?: {} }
     'import.status': { paramsTuple?: []; params?: {} }
     'import.run': { paramsTuple?: []; params?: {} }
+    'prices.update': { paramsTuple?: []; params?: {} }
     'sets.index': { paramsTuple?: []; params?: {} }
     'sets.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'cards.index': { paramsTuple?: []; params?: {} }
@@ -21,6 +22,8 @@ export type ScannedRoutes = {
     'copies.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'copies.slot': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'copies.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'history.index': { paramsTuple?: []; params?: {} }
+    'shopping.index': { paramsTuple?: []; params?: {} }
     'storage_locations.index': { paramsTuple?: []; params?: {} }
     'storage_locations.store': { paramsTuple?: []; params?: {} }
     'storage_locations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -46,6 +49,8 @@ export type ScannedRoutes = {
     'cards.filters': { paramsTuple?: []; params?: {} }
     'cards.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'copies.index': { paramsTuple?: []; params?: {} }
+    'history.index': { paramsTuple?: []; params?: {} }
+    'shopping.index': { paramsTuple?: []; params?: {} }
     'storage_locations.index': { paramsTuple?: []; params?: {} }
     'storage_locations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'decklists.index': { paramsTuple?: []; params?: {} }
@@ -61,6 +66,8 @@ export type ScannedRoutes = {
     'cards.filters': { paramsTuple?: []; params?: {} }
     'cards.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'copies.index': { paramsTuple?: []; params?: {} }
+    'history.index': { paramsTuple?: []; params?: {} }
+    'shopping.index': { paramsTuple?: []; params?: {} }
     'storage_locations.index': { paramsTuple?: []; params?: {} }
     'storage_locations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'decklists.index': { paramsTuple?: []; params?: {} }
@@ -72,6 +79,7 @@ export type ScannedRoutes = {
     'auth.access_tokens.store': { paramsTuple?: []; params?: {} }
     'profile.access_tokens.destroy': { paramsTuple?: []; params?: {} }
     'import.run': { paramsTuple?: []; params?: {} }
+    'prices.update': { paramsTuple?: []; params?: {} }
     'copies.store': { paramsTuple?: []; params?: {} }
     'storage_locations.store': { paramsTuple?: []; params?: {} }
     'decklists.store': { paramsTuple?: []; params?: {} }

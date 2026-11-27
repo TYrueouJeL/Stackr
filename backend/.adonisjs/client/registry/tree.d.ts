@@ -22,6 +22,9 @@ export interface ApiDefinition {
     status: typeof routes['import.status']
     run: typeof routes['import.run']
   }
+  prices: {
+    update: typeof routes['prices.update']
+  }
   sets: {
     index: typeof routes['sets.index']
     show: typeof routes['sets.show']
@@ -38,6 +41,12 @@ export interface ApiDefinition {
     update: typeof routes['copies.update']
     slot: typeof routes['copies.slot']
     destroy: typeof routes['copies.destroy']
+  }
+  history: {
+    index: typeof routes['history.index']
+  }
+  shopping: {
+    index: typeof routes['shopping.index']
   }
   storageLocations: {
     index: typeof routes['storage_locations.index']

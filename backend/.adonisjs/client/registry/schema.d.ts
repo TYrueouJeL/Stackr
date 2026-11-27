@@ -86,6 +86,19 @@ export interface Registry {
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/import_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'prices.update': {
+    methods: ["POST"]
+    pattern: '/api/v1/prices'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/import_controller').default['prices']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/import_controller').default['prices']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/import_controller').default['prices']>>>
+    }
+  }
   'sets.index': {
     methods: ["GET","HEAD"]
     pattern: '/api/v1/sets'
@@ -227,6 +240,32 @@ export interface Registry {
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/copies_controller').default['destroy']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/copies_controller').default['destroy']>>>
       rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/copies_controller').default['destroy']>>>
+    }
+  }
+  'history.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/history'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/history_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/history_controller').default['index']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/history_controller').default['index']>>>
+    }
+  }
+  'shopping.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/shopping-list'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/shopping_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/shopping_controller').default['index']>>>
+      rawResponse: ExtractRawResponse<Awaited<ReturnType<import('#controllers/shopping_controller').default['index']>>>
     }
   }
   'storage_locations.index': {

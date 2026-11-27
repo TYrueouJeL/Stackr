@@ -6,6 +6,7 @@ import DecklistEntry from '#models/decklist_entry'
 import CardCopy from '#models/card_copy'
 import { assertOwnedTargets } from '#services/ownership'
 import { checkLegality } from '#services/deck_legality'
+import { pricesFor } from '#services/cardmarket_prices'
 import { leaveDeckBox, moveDeckBox, storeInDeckBox } from '#services/deck_storage'
 import {
   SECTIONS,
@@ -20,6 +21,8 @@ import {
   decklistImportValidator,
   decklistValidator,
 } from '#validators/stock'
+
+const round = (n: number) => Math.round(n * 100) / 100
 
 export default class DecklistsController {
   async index({ auth }: HttpContext) {
@@ -180,12 +183,13 @@ export default class DecklistsController {
     const pool = new Map<string, CardCopy[]>()
     for (const copy of copies) pool.set(copy.cardId, [...(pool.get(copy.cardId) ?? []), copy])
 
+    const prices = await pricesFor(entries.map((e) => e.cardId))
     const rows = entries.map((entry) => {
       const remaining = pool.get(entry.cardId) ?? []
       const assigned = remaining.splice(0, entry.quantity)
       return {
         section: entry.section,
-        card: entry.card.toApi(),
+        card: { ...entry.card.toApi(), price: prices.get(entry.cardId) ?? null },
         quantity: entry.quantity,
         assigned: assigned.map((c) => c.toApi()),
         missing: Math.max(0, entry.quantity - assigned.length),
@@ -212,6 +216,9 @@ export default class DecklistsController {
       totalCards,
       assignedCopies: assignedCount,
       missingCards: rows.reduce((s, r) => s + r.missing, 0),
+      // Valeur du deck et coût des cartes qu'il reste à mettre en place (prix tendance)
+      value: round(rows.reduce((s, r) => s + (r.card.price?.value ?? 0) * r.quantity, 0)),
+      missingValue: round(rows.reduce((s, r) => s + (r.card.price?.value ?? 0) * r.missing, 0)),
       sections,
       legality: checkLegality(
         entries.map((e) => ({ section: e.section, quantity: e.quantity, card: e.card }))

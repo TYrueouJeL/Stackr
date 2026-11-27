@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CardDetail } from '~/utils/types'
+import { formatEuro, type CardDetail } from '~/utils/types'
 
 const route = useRoute()
 const { data: card, refresh } = await useApiFetch<CardDetail>(() => `/cards/${encodeURIComponent(String(route.params.id))}`)
@@ -60,6 +60,21 @@ useHead(() => ({ title: card.value ? `${card.value.name} · Stackr` : 'Stackr' }
           </div>
         </div>
 
+        <div v-if="card.price" class="panel price-panel">
+          <div class="stack" style="gap: 0.2rem">
+            <span class="eyebrow">Prix Cardmarket</span>
+            <strong class="gold-text price-main">{{ formatEuro(card.price.trend ?? card.price.trendFoil) }}</strong>
+            <span class="tiny faint">Tendance{{ card.price.trend === null ? ' (foil)' : '' }}</span>
+          </div>
+          <div class="price-grid small">
+            <span class="muted">Plus bas</span><span>{{ formatEuro(card.price.low) }}</span>
+            <span class="muted">Moyenne 30 j</span><span>{{ formatEuro(card.price.avg30) }}</span>
+            <span class="muted">Foil tendance</span><span>{{ formatEuro(card.price.trendFoil) }}</span>
+            <span class="muted">Foil plus bas</span><span>{{ formatEuro(card.price.lowFoil) }}</span>
+          </div>
+          <a :href="card.price.url" target="_blank" rel="noopener" class="tag">Voir sur Cardmarket ↗</a>
+        </div>
+
         <div v-if="card.decklists.length" class="stack" style="gap: 0.4rem">
           <span class="eyebrow">Utilisée dans</span>
           <div class="row">
@@ -86,3 +101,9 @@ useHead(() => ({ title: card.value ? `${card.value.name} · Stackr` : 'Stackr' }
     </div>
   </div>
 </template>
+
+<style scoped>
+.price-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 2rem; }
+.price-main { font-family: var(--font-display); font-size: 1.8rem; }
+.price-grid { display: grid; grid-template-columns: auto auto; gap: 0.2rem 1rem; font-variant-numeric: tabular-nums; }
+</style>

@@ -7,6 +7,8 @@ const links = [
   { to: '/cards', label: 'Cartes', match: (p: string) => p.startsWith('/cards') },
   { to: '/decklists', label: 'Decklists', match: (p: string) => p.startsWith('/decklists') },
   { to: '/storage', label: 'Rangements', match: (p: string) => p.startsWith('/storage') },
+  { to: '/shopping', label: "Liste d'achat", match: (p: string) => p.startsWith('/shopping') },
+  { to: '/history', label: 'Historique', match: (p: string) => p.startsWith('/history') },
 ]
 const initials = computed(() => {
   const source = user.value?.fullName || user.value?.email || '?'

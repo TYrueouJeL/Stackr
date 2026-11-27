@@ -44,6 +44,12 @@ const routes = {
     tokens: [[0,"api"],[0,"v1"],[0,"import"]],
     types: placeholder as Registry['import.run']['types'],
   },
+  'prices.update': {
+    methods: ["POST"],
+    pattern: '/api/v1/prices',
+    tokens: [[0,"api"],[0,"v1"],[0,"prices"]],
+    types: placeholder as Registry['prices.update']['types'],
+  },
   'sets.index': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/sets',
@@ -109,6 +115,18 @@ const routes = {
     pattern: '/api/v1/copies/:id',
     tokens: [[0,"api"],[0,"v1"],[0,"copies"],[1,"id"]],
     types: placeholder as Registry['copies.destroy']['types'],
+  },
+  'history.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/history',
+    tokens: [[0,"api"],[0,"v1"],[0,"history"]],
+    types: placeholder as Registry['history.index']['types'],
+  },
+  'shopping.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/shopping-list',
+    tokens: [[0,"api"],[0,"v1"],[0,"shopping-list"]],
+    types: placeholder as Registry['shopping.index']['types'],
   },
   'storage_locations.index': {
     methods: ["GET","HEAD"],

@@ -69,6 +69,33 @@ export class CardCopySchema extends BaseModel {
   declare userId: number | null
 }
 
+export class CardPriceSchema extends BaseModel {
+  static $columns = ['avg30', 'avg7', 'avg7Foil', 'cardId', 'cardmarketId', 'low', 'lowFoil', 'matchedBy', 'trend', 'trendFoil', 'updatedAt'] as const
+  $columns = CardPriceSchema.$columns
+  @column({ columnName: 'avg30' })
+  declare avg30: number | null
+  @column({ columnName: 'avg7' })
+  declare avg7: number | null
+  @column({ columnName: 'avg7_foil' })
+  declare avg7Foil: number | null
+  @column({ isPrimary: true })
+  declare cardId: string
+  @column()
+  declare cardmarketId: number
+  @column()
+  declare low: number | null
+  @column()
+  declare lowFoil: number | null
+  @column()
+  declare matchedBy: string
+  @column()
+  declare trend: number | null
+  @column()
+  declare trendFoil: number | null
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+}
+
 export class CardSetSchema extends BaseModel {
   static $columns = ['createdAt', 'id', 'name', 'position', 'updatedAt'] as const
   $columns = CardSetSchema.$columns
@@ -129,6 +156,25 @@ export class CardSchema extends BaseModel {
   declare type: string | null
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
+}
+
+export class CollectionEventSchema extends BaseModel {
+  static $columns = ['action', 'cardId', 'createdAt', 'details', 'id', 'quantity', 'userId'] as const
+  $columns = CollectionEventSchema.$columns
+  @column()
+  declare action: string
+  @column()
+  declare cardId: string
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare details: string | null
+  @column({ isPrimary: true })
+  declare id: number
+  @column()
+  declare quantity: number
+  @column()
+  declare userId: number
 }
 
 export class DecklistEntrySchema extends BaseModel {

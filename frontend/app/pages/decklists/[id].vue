@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { SECTION_LABELS, type Card, type Copy, type DeckSection, type DecklistDetail } from '~/utils/types'
+import { SECTION_LABELS, formatEuro, type Card, type Copy, type DeckSection, type DecklistDetail } from '~/utils/types'
 
 const route = useRoute()
 const id = computed(() => Number(route.params.id))
@@ -148,6 +148,10 @@ async function assign(copyId: number, decklistId: number | null) {
             <span v-if="deck.missingCards" class="tag warn">{{ deck.missingCards }} carte{{ deck.missingCards > 1 ? 's' : '' }} manquante{{ deck.missingCards > 1 ? 's' : '' }}</span>
             <span v-else-if="deck.totalCards" class="tag ok">✓ Deck complet</span>
             <span class="tag">{{ deck.totalCards }} cartes</span>
+            <span v-if="deck.value" class="tag" title="Valeur du deck au prix tendance Cardmarket">💶 {{ formatEuro(deck.value) }}</span>
+            <NuxtLink v-if="deck.missingCards" :to="`/shopping?decklists=${deck.id}`" class="tag warn" title="Voir les cartes à acheter">
+              🛒 Liste d'achat
+            </NuxtLink>
           </div>
           <label class="inline small muted deck-box">
             📦 Rangé dans

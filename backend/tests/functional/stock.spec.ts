@@ -917,3 +917,134 @@ test.group('Galerie Riot (Radiance)', (group) => {
     )
   })
 })
+
+test.group('Historique, liste d’achat et prix', (group) => {
+  group.each.setup(async () => {
+    const cleanup = await testUtils.db().truncate()
+    user = await User.create({ email: 'ty@example.com', password: 'motdepasse123' })
+    return cleanup
+  })
+
+  test('les ajouts et retraits sont dans l’historique', async ({ assert, client }) => {
+    await loadFixture()
+    const added = await client
+      .post('/api/v1/copies')
+      .loginAs(user)
+      .json({ cardId: 'TST-001', quantity: 2, foil: true })
+    const [first] = added.body() as any[]
+    await client.delete(`/api/v1/copies/${first.id}`).loginAs(user)
+
+    const res = await client.get('/api/v1/history').loginAs(user)
+    res.assertStatus(200)
+    const body = res.body() as any
+    assert.deepEqual(
+      body.data.map((e: any) => [e.action, e.quantity, e.card.id, e.details.foil]),
+      [
+        ['removed', 1, 'TST-001', true],
+        ['added', 2, 'TST-001', true],
+      ]
+    )
+    assert.deepEqual(body.totals, { added: 2, removed: 1 })
+    const other = await User.create({ email: 'b@example.com', password: 'motdepasse123' })
+    const otherRes = await client.get('/api/v1/history').loginAs(other)
+    assert.lengthOf((otherRes.body() as any).data, 0)
+  })
+
+  test('la liste d’achat compte les cartes par nom, toutes impressions confondues', async ({
+    assert,
+    client,
+  }) => {
+    await deckFixture()
+    const make = async (name: string) => {
+      const res = await client.post('/api/v1/decklists').loginAs(user).json({ name })
+      return (res.body() as any).id
+    }
+    const a = await make('Deck A')
+    const b = await make('Deck B')
+    // 3 Cleave dans A, 2 dans B ; on possède 1 Cleave (DCK) + 1 promo (PRM) affectée à B
+    await client
+      .put(`/api/v1/decklists/${a}/entries`)
+      .loginAs(user)
+      .json({ cardId: 'DCK-006', quantity: 3 })
+    await client
+      .put(`/api/v1/decklists/${b}/entries`)
+      .loginAs(user)
+      .json({ cardId: 'DCK-006', quantity: 2 })
+    await client.post('/api/v1/copies').loginAs(user).json({ cardId: 'DCK-006' })
+    await client.post('/api/v1/copies').loginAs(user).json({ cardId: 'PRM-001', decklistId: b })
+
+    const onlyA = await client
+      .get('/api/v1/shopping-list')
+      .qs({ decklists: String(a) })
+      .loginAs(user)
+    const la = onlyA.body() as any
+    assert.deepEqual(
+      la.lines.map((l: any) => [l.name, l.needed, l.available, l.missing]),
+      [['Cleave', 3, 1, 2]]
+    )
+    assert.equal(la.text, '2 Cleave')
+
+    const both = await client.get('/api/v1/shopping-list').loginAs(user)
+    const lb = both.body() as any
+    assert.deepEqual(
+      lb.lines.map((l: any) => [l.name, l.needed, l.available, l.missing]),
+      [['Cleave', 5, 2, 3]]
+    )
+    assert.equal(lb.totalMissing, 3)
+  })
+
+  test('les prix Cardmarket sont reliés aux cartes et utilisés partout', async ({
+    assert,
+    client,
+  }) => {
+    await deckFixture()
+    const { savePrices, codeToCardId } = await import('#services/cardmarket_prices')
+    assert.equal(codeToCardId('OGN-066a/298'), 'OGN-066A-298')
+    const result = await savePrices({
+      guide: {
+        createdAt: '2026-11-27T09:00:00+0100',
+        priceGuides: [
+          { 'idProduct': 1001, 'trend': 0.5, 'low': 0.2, 'trend-foil': 2 },
+          { idProduct: 1002, trend: 12.34, low: 10 },
+          { 'idProduct': 1003, 'trend': null, 'trend-foil': 3 },
+        ],
+      },
+      // Cleave a deux impressions (DCK et PRM) : seul OpenRift peut lever l'ambiguïté
+      products: [
+        { idProduct: 1002, name: "Rek'Sai, Breacher" },
+        { idProduct: 1003, name: 'Salvage' },
+        { idProduct: 1999, name: 'Cleave' },
+      ],
+      openrift: new Map([['DCK-006', 1001]]),
+    })
+    assert.deepEqual([result.priced, result.byOpenrift, result.byName], [3, 1, 2])
+
+    const card = await client.get('/api/v1/cards/DCK-006').loginAs(user)
+    assert.equal((card.body() as any).price.trend, 0.5)
+    assert.include((card.body() as any).price.url, 'idProduct=1001')
+    const salvage = await client.get('/api/v1/cards/DCK-027').loginAs(user)
+    assert.equal((salvage.body() as any).price.value, 3)
+
+    const deckRes = await client.post('/api/v1/decklists').loginAs(user).json({ name: 'D' })
+    const deckId = (deckRes.body() as any).id
+    await client
+      .put(`/api/v1/decklists/${deckId}/entries`)
+      .loginAs(user)
+      .json({ cardId: 'DCK-006', quantity: 3 })
+    await client
+      .put(`/api/v1/decklists/${deckId}/entries`)
+      .loginAs(user)
+      .json({ cardId: 'DCK-002', quantity: 1 })
+    const detailRes = await client.get(`/api/v1/decklists/${deckId}`).loginAs(user)
+    const detail = detailRes.body() as any
+    assert.equal(detail.value, 13.84)
+    assert.equal(detail.missingValue, 13.84)
+
+    const shopRes = await client.get('/api/v1/shopping-list').loginAs(user)
+    assert.equal((shopRes.body() as any).totalCost, 13.84)
+
+    await client.post('/api/v1/copies').loginAs(user).json({ cardId: 'DCK-006', foil: true })
+    const statusRes = await client.get('/api/v1/import').loginAs(user)
+    assert.equal((statusRes.body() as any).collectionValue, 2)
+  })
+})

@@ -37,6 +37,7 @@ router
         // Mise à jour du catalogue (RiftCodex ou API Riot)
         router.get('import', [controllers.Import, 'status']).as('import.status')
         router.post('import', [controllers.Import, 'store']).as('import.run')
+        router.post('prices', [controllers.Import, 'prices']).as('prices.update')
 
         // Catalogue
         router.get('sets', [controllers.Sets, 'index']).as('sets.index')
@@ -52,6 +53,10 @@ router
         router.patch('copies/:id', [controllers.Copies, 'update']).as('copies.update')
         router.put('copies/:id/slot', [controllers.Copies, 'placeInSlot']).as('copies.slot')
         router.delete('copies/:id', [controllers.Copies, 'destroy']).as('copies.destroy')
+
+        // Historique et liste d'achat
+        router.get('history', [controllers.History, 'index']).as('history.index')
+        router.get('shopping-list', [controllers.Shopping, 'index']).as('shopping.index')
 
         // Rangements
         router

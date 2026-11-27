@@ -15,6 +15,65 @@ export interface Card {
   fullUrl: string | null
   artist: string | null
   owned?: number
+  price?: CardPrice | null
+}
+
+export interface CardPrice {
+  trend: number | null
+  low: number | null
+  avg30: number | null
+  trendFoil: number | null
+  lowFoil: number | null
+  value: number | null
+  url: string
+}
+
+export function formatEuro(value: number | null | undefined) {
+  if (value === null || value === undefined) return '—'
+  return value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
+}
+
+export interface HistoryEvent {
+  id: number
+  action: 'added' | 'removed'
+  quantity: number
+  createdAt: string
+  details: {
+    foil?: boolean
+    condition?: string
+    language?: string
+    storage?: string | null
+    decklist?: string | null
+  } | null
+  card: Pick<Card, 'id' | 'name' | 'setId' | 'collectorNumber' | 'thumbnailUrl' | 'rarity'> | null
+}
+
+export interface HistoryPage {
+  meta: { total: number; perPage: number; currentPage: number; lastPage: number }
+  totals: { added: number; removed: number }
+  data: HistoryEvent[]
+}
+
+export interface ShoppingLine {
+  key: string
+  name: string
+  card: Card
+  needed: number
+  available: number
+  missing: number
+  decklists: { id: number; name: string; quantity: number }[]
+  price: CardPrice | null
+  total: number | null
+}
+
+export interface ShoppingList {
+  decklists: { id: number; name: string; selected: boolean }[]
+  totalNeeded: number
+  totalMissing: number
+  lines: ShoppingLine[]
+  totalCost: number
+  unpriced: number
+  text: string
 }
 
 export interface SetSummary {
@@ -115,6 +174,8 @@ export interface DecklistDetail {
   totalCards: number
   assignedCopies: number
   missingCards: number
+  value: number
+  missingValue: number
   entries: {
     section: DeckSection
     card: Card

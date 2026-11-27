@@ -3,6 +3,7 @@ import db from '@adonisjs/lucid/services/db'
 import Card from '#models/card'
 import CardCopy from '#models/card_copy'
 import DecklistEntry from '#models/decklist_entry'
+import { pricesFor } from '#services/cardmarket_prices'
 import { cardSearchConditions, parseCardQuery } from '#services/card_search'
 
 export default class CardsController {
@@ -33,9 +34,14 @@ export default class CardsController {
       .orderBy('name')
       .paginate(page, perPage)
 
+    const prices = await pricesFor(result.all().map((c) => c.id))
     return {
       meta: result.getMeta(),
-      data: result.all().map((c) => ({ ...c.toApi(), owned: Number(c.$extras.owned) })),
+      data: result.all().map((c) => ({
+        ...c.toApi(),
+        owned: Number(c.$extras.owned),
+        price: prices.get(c.id) ?? null,
+      })),
     }
   }
 
@@ -71,9 +77,11 @@ export default class CardsController {
       .whereHas('decklist', (q) => q.where('user_id', userId))
       .preload('decklist')
 
+    const prices = await pricesFor([card.id])
     return {
       ...card.toApi(),
       set: { id: card.set.id, name: card.set.name },
+      price: prices.get(card.id) ?? null,
       owned: copies.length,
       copies: copies.map((c) => c.toApi()),
       decklists: decklists.map((e) => ({

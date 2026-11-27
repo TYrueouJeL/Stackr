@@ -1,3 +1,4 @@
+import { pricesFor } from '#services/cardmarket_prices'
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import CardSet from '#models/card_set'
@@ -56,7 +57,12 @@ export default class SetsController {
       .orderByRaw('collector_number is null, collector_number')
       .orderBy('name')
 
-    const items = cards.map((c) => ({ ...c.toApi(), owned: Number(c.$extras.owned) }))
+    const prices = await pricesFor(cards.map((c) => c.id))
+    const items = cards.map((c) => ({
+      ...c.toApi(),
+      owned: Number(c.$extras.owned),
+      price: prices.get(c.id) ?? null,
+    }))
     const owned = items.filter((c) => c.owned > 0).length
 
     const byRarity: Record<string, { total: number; owned: number }> = {}

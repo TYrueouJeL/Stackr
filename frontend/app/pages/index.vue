@@ -1,6 +1,6 @@
 <script setup lang="ts">
 type ImportSource = 'all' | 'riftcodex' | 'gallery' | 'riot'
-import type { SetSummary } from '~/utils/types'
+import { formatEuro, type SetSummary } from '~/utils/types'
 
 const { show } = useToast()
 const { user } = useAuth()
@@ -13,6 +13,8 @@ const { data: status, refresh: refreshStatus } = await useApiFetch<{
   source: ImportSource
   apiKeyConfigured: boolean
   canImport: boolean
+  lastPriceUpdate: string | null
+  collectionValue: number
 }>('/import')
 
 const importing = ref(false)
@@ -26,6 +28,20 @@ const totals = computed(() => {
 })
 
 const firstName = computed(() => user.value?.fullName?.split(' ')[0] ?? null)
+
+const updatingPrices = ref(false)
+async function runPriceUpdate() {
+  updatingPrices.value = true
+  try {
+    const res = await api<{ priced: number }>('/prices', { method: 'POST' })
+    show(`${res.priced} prix Cardmarket mis à jour`)
+    await Promise.all([refresh(), refreshStatus()])
+  } catch (e) {
+    show(apiError(e), 'error')
+  } finally {
+    updatingPrices.value = false
+  }
+}
 
 async function runImport() {
   importing.value = true
@@ -59,6 +75,7 @@ async function runImport() {
             <div class="hero-stat"><div class="value">{{ totals.owned }}<span class="faint" style="font-size: 0.6em"> / {{ totals.total }}</span></div><div class="label">Cartes différentes</div></div>
             <div class="hero-stat"><div class="value">{{ status?.copies ?? 0 }}</div><div class="label">Exemplaires</div></div>
             <div class="hero-stat"><div class="value">{{ sets?.length ?? 0 }}</div><div class="label">Extensions</div></div>
+            <div v-if="status?.collectionValue" class="hero-stat" title="Au prix tendance Cardmarket (prix foil pour les exemplaires foil)"><div class="value gold-text">{{ formatEuro(status.collectionValue) }}</div><div class="label">Valeur estimée</div></div>
           </div>
         </div>
         <ProgressRing :value="totals.completion" :size="168" :stroke="12">
@@ -82,6 +99,9 @@ async function runImport() {
         </select>
         <button class="primary" :disabled="importing" @click="runImport">
           {{ importing ? 'Import en cours…' : '⟳ Mettre à jour le catalogue' }}
+        </button>
+        <button class="ghost" :disabled="updatingPrices" title="Les prix se mettent aussi à jour tout seuls chaque jour" @click="runPriceUpdate">
+          {{ updatingPrices ? 'Prix en cours…' : '💶 Mettre à jour les prix' }}
         </button>
       </div>
     </div>
@@ -123,6 +143,7 @@ async function runImport() {
 
     <p v-if="status?.lastImport" class="tiny faint" style="margin-top: 2rem; text-align: center">
       Catalogue mis à jour le {{ new Date(status.lastImport).toLocaleString('fr-FR') }}
+      <template v-if="status.lastPriceUpdate"> · Prix Cardmarket du {{ new Date(status.lastPriceUpdate).toLocaleString('fr-FR') }}</template>
     </p>
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Card } from '~/utils/types'
+import { formatEuro, type Card } from '~/utils/types'
 
 const props = defineProps<{ card: Card; count?: number; label?: string; hideMeta?: boolean }>()
 const owned = computed(() => props.count ?? props.card.owned ?? 0)
@@ -78,7 +78,12 @@ function onLeave() {
       <span class="sub">
         <span class="dot" :class="rarityClass(card.rarity)" :style="{ color: 'var(--r)', background: 'var(--r)' }" />
         {{ card.rarity ?? '—' }} · #{{ card.collectorNumber ?? '?' }}
+        <span v-if="card.price?.value" class="price" title="Prix tendance Cardmarket">{{ formatEuro(card.price.value) }}</span>
       </span>
     </div>
   </div>
 </template>
+
+<style scoped>
+.price { margin-left: auto; color: var(--gold, #e8c36a); font-variant-numeric: tabular-nums; }
+</style>

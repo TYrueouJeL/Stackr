@@ -8,9 +8,11 @@ export const controllers = {
   Cards: () => import('#controllers/cards_controller'),
   Copies: () => import('#controllers/copies_controller'),
   Decklists: () => import('#controllers/decklists_controller'),
+  History: () => import('#controllers/history_controller'),
   Import: () => import('#controllers/import_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),
   Profile: () => import('#controllers/profile_controller'),
   Sets: () => import('#controllers/sets_controller'),
+  Shopping: () => import('#controllers/shopping_controller'),
   StorageLocations: () => import('#controllers/storage_locations_controller'),
 }

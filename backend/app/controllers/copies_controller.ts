@@ -4,6 +4,7 @@ import { DateTime } from 'luxon'
 import CardCopy from '#models/card_copy'
 import { assertOwnedTargets } from '#services/ownership'
 import { leaveDeckBox, storeInDeckBox } from '#services/deck_storage'
+import { logCollectionEvent } from '#services/collection_history'
 import { Exception } from '@adonisjs/core/exceptions'
 import {
   binderSlotValidator,
@@ -69,6 +70,16 @@ export default class CopiesController {
         )
         for (const c of created) await c.refresh()
       }
+      await logCollectionEvent(
+        {
+          userId,
+          cardId: data.cardId,
+          action: 'added',
+          quantity,
+          details: await this.describe(created[0], trx),
+        },
+        trx
+      )
       return created
     })
     return response.created(copies.map((c) => c.toApi()))
@@ -216,7 +227,32 @@ export default class CopiesController {
   async destroy({ auth, params, response }: HttpContext) {
     const userId = auth.getUserOrFail().id
     const copy = await CardCopy.query().where({ id: params.id, user_id: userId }).firstOrFail()
-    await copy.delete()
+    await db.transaction(async (trx) => {
+      const details = await this.describe(copy, trx)
+      copy.useTransaction(trx)
+      await copy.delete()
+      await logCollectionEvent(
+        { userId, cardId: copy.cardId, action: 'removed', quantity: 1, details },
+        trx
+      )
+    })
     return response.noContent()
+  }
+
+  /** Résumé d'un exemplaire pour l'historique (les noms sont figés au moment de l'action) */
+  private async describe(copy: CardCopy, client: any) {
+    const storage = copy.storageLocationId
+      ? await client.from('storage_locations').where('id', copy.storageLocationId).first()
+      : null
+    const deck = copy.decklistId
+      ? await client.from('decklists').where('id', copy.decklistId).first()
+      : null
+    return {
+      foil: Boolean(copy.foil),
+      condition: copy.condition,
+      language: copy.language,
+      storage: storage?.name ?? null,
+      decklist: deck?.name ?? null,
+    }
   }
 }
